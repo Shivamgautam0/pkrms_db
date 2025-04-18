@@ -3,15 +3,15 @@ from django.forms import ValidationError
 from .link import Link
 
 class RetainingWallCondition(models.Model):
-    id = models.AutoField(primary_key=True,db_column='id')
-    year = models.IntegerField(db_column='year')
+    # id = models.AutoField(primary_key=True,db_column='id')
+    year = models.CharField(max_length=255, db_column='year')
     admin_code = models.CharField(max_length=255,db_column='adminCode')
-    link_no = models.CharField(max_length=50,db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
     wall_number = models.CharField(max_length=255,db_column='wallNumber')
-    wall_mortar_m2 = models.FloatField(null=True, blank=True, db_column='wallMortarM2')
-    wall_repair_m3 = models.FloatField(null=True, blank=True, db_column='wallRepairM3')
-    wall_rebuild_m = models.FloatField(null=True, blank=True, db_column='wallRebuildM')
-    analysis_base_year = models.IntegerField(null=True, blank=True, db_column='analysisBaseYear')
+    wall_mortar_m2 = models.CharField(max_length=255, null=True, blank=True, db_column='wallMortarM2')
+    wall_repair_m3 = models.CharField(max_length=255, null=True, blank=True, db_column='wallRepairM3')
+    wall_rebuild_m = models.CharField(max_length=255, null=True, blank=True, db_column='wallRebuildM')
+    analysis_base_year = models.CharField(max_length=255, null=True, blank=True, db_column='analysisBaseYear')
     survey_by = models.CharField(max_length=255, null=True, blank=True, db_column='surveyBy')
 
 # Year, Province_Code, Kabupaten_Code, Link_No, Wall_Number, 

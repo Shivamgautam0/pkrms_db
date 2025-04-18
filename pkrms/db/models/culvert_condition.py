@@ -2,10 +2,10 @@ from django.db import models
 from django.forms import ValidationError
 from .link import Link
 class CulvertCondition(models.Model):
-    id = models.AutoField(primary_key=True,db_column='id')
-    year = models.IntegerField( db_column='year')
-    admin_code = models.CharField(max_length=100, db_column='adminCode')    
-    link_no = models.CharField(max_length=50,db_column='linkNo')
+    # id = models.AutoField(primary_key=True,db_column='id')
+    year = models.CharField(max_length=255, db_column='year')
+    admin_code = models.CharField(max_length=255, db_column='adminCode')    
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
     culvert_number = models.CharField(max_length=100, db_column='culvertNumber')
     cond_barrel = models.CharField(max_length=255, null=True, blank=True, db_column='condBarrel')
     cond_inlet = models.CharField( max_length=255,null=True, blank=True, db_column='condInlet')

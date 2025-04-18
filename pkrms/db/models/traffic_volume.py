@@ -3,26 +3,26 @@ from django.forms import ValidationError
 from .link import Link
 
 class TrafficVolume(models.Model):
-    id = models.AutoField(primary_key=True,db_column='id')
-    year = models.IntegerField(null=True, blank=True, db_column='year')
-    admin_code = models.IntegerField(db_column='adminCode')
-    link_no = models.CharField(max_length=50,db_column='linkNo')
-    marketday = models.BooleanField(null=True, blank=True, db_column='marketDay')
+    # id = models.AutoField(primary_key=True,db_column='id')
+    year = models.CharField(max_length=255, null=False, blank=False, db_column='year')
+    admin_code = models.CharField(max_length=255, db_column='adminCode')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
+    marketday = models.CharField(max_length=255, null=True, blank=True, db_column='marketDay')
     trafficcount = models.CharField(max_length=255,null=True, blank=True, db_column='trafficCount')
-    journeytime = models.FloatField(null=True, blank=True, db_column='journeyTime')
-    aadt_mc = models.IntegerField(null=True, blank=True, db_column='aadtMc')
-    aadt_car = models.IntegerField(null=True, blank=True, db_column='aadtCar')
-    aadt_pickup = models.IntegerField(null=True, blank=True, db_column='aadtPickup')
-    aadt_microtruck = models.IntegerField(null=True, blank=True, db_column='aadtMicroTruck')
-    aadt_small_bus = models.IntegerField(null=True, blank=True, db_column='aadtSmallBus')
-    aadt_large_bus = models.IntegerField(null=True, blank=True, db_column='aadtLargeBus')
-    aadt_small_truck = models.IntegerField(null=True, blank=True, db_column='aadtSmallTruck')
-    aadt_medium_truck = models.IntegerField(null=True, blank=True, db_column='aadtMediumTruck')
-    aadt_large_truck = models.IntegerField(null=True, blank=True, db_column='aadtLargeTruck')
-    aadt_truck_trailer = models.IntegerField(null=True, blank=True, db_column='aadtTruckTrailer')
-    aadt_semi_trailer = models.IntegerField(null=True, blank=True, db_column='aadtSemiTrailer')
-    analysisbaseyear = models.BooleanField(null=True, blank=True, db_column='analysisBaseYear')
-    surveyby = models.FloatField(null=True, blank=True, db_column='surveyBy')
+    journeytime = models.CharField(max_length=255, null=True, blank=True, db_column='journeyTime')
+    aadt_mc = models.CharField(max_length=255, null=True, blank=True, db_column='aadtMc')
+    aadt_car = models.CharField(max_length=255, null=True, blank=True, db_column='aadtCar')
+    aadt_pickup = models.CharField(max_length=255, null=True, blank=True, db_column='aadtPickup')
+    aadt_microtruck = models.CharField(max_length=255, null=True, blank=True, db_column='aadtMicroTruck')
+    aadt_small_bus = models.CharField(max_length=255, null=True, blank=True, db_column='aadtSmallBus')
+    aadt_large_bus = models.CharField(max_length=255, null=True, blank=True, db_column='aadtLargeBus')
+    aadt_small_truck = models.CharField(max_length=255, null=True, blank=True, db_column='aadtSmallTruck')
+    aadt_medium_truck = models.CharField(max_length=255, null=True, blank=True, db_column='aadtMediumTruck')
+    aadt_large_truck = models.CharField(max_length=255, null=True, blank=True, db_column='aadtLargeTruck')
+    aadt_truck_trailer = models.CharField(max_length=255, null=True, blank=True, db_column='aadtTruckTrailer')
+    aadt_semi_trailer = models.CharField(max_length=255, null=True, blank=True, db_column='aadtSemiTrailer')
+    analysisbaseyear = models.CharField(max_length=255, null=True, blank=True, db_column='analysisBaseYear')
+    surveyby = models.CharField(max_length=255, null=True, blank=True, db_column='surveyBy')
 
     # @classmethod
     # def create_with_admin_code(cls, province_code, kabupaten_code, **kwargs):
@@ -32,6 +32,7 @@ class TrafficVolume(models.Model):
     
     def clean(self):
         required_fields = [
+            self.year,
             self.admin_code,
             self.link_no
         ]

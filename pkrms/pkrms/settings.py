@@ -79,14 +79,11 @@ WSGI_APPLICATION = 'pkrms.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'pkrms',
-        'USER': 'postgres',
-        'PASSWORD': '1234',
-        'HOST': 'localhost',  # Or your DB server IP
-        'PORT': '5432',       # Default PostgreSQL port
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',  # Path to your SQLite database file
     }
 }
+
 
 
 # Password validation
@@ -148,8 +145,8 @@ REST_FRAMEWORK = {
 CORS_ALLOW_ALL_ORIGINS = True  # For development only
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5174",  # Your frontend URL
-    "http://127.0.0.1:5174",
+    "http://localhost:5173",  # Your frontend URL
+    "http://127.0.0.1:5173",
 ]
 
 CORS_ALLOW_METHODS = [

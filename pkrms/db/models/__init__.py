@@ -17,6 +17,11 @@ from .road_condition import RoadCondition
 from .road_inventory import RoadInventory
 from .traffic_volume import TrafficVolume
 from .form_data import FormData
+from .traffic_weighting_factors import TrafficWeightingFactors
+from .drp import DRP    
+from .alignment import Alignment
+from .road_hazards import RoadHazard
+
 
 __all__ = [
     "BridgeInventory",
@@ -37,5 +42,9 @@ __all__ = [
     "RoadCondition",
     "RoadInventory",
     "TrafficVolume",
-    "FormData"
+    "FormData",
+    "TrafficWeightingFactors",
+    "DRP",
+    "Alignment",
+    "RoadHazard"
 ]

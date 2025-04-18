@@ -4,11 +4,11 @@ from django.forms import ValidationError
 from .link import Link
 
 class CulvertInventory(models.Model):
-    id = models.AutoField(primary_key=True,db_column='id')
-    admin_code = models.IntegerField(db_column='adminCode')
-    link_no = models.CharField(max_length=50,db_column='linkNo')
+    # id = models.AutoField(primary_key=True,db_column='id')
+    admin_code = models.CharField(max_length=255,db_column='adminCode')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
     culvert_number = models.CharField(max_length=255,db_column='culvertNumber')
-    chainage = models.IntegerField(db_column='chainage')
+    chainage = models.CharField(max_length=255,db_column='chainage')
     drp_from = models.CharField( max_length=255,null=True, blank=True, db_column='drpFrom')
     offset_from = models.CharField( max_length=255,null=True, blank=True, db_column='offsetFrom')
     culvert_length = models.CharField( max_length=255,null=True, blank=True, db_column='culvertLength')

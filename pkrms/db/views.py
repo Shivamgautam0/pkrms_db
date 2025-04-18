@@ -27,7 +27,11 @@ from .serializers import (
     RoadConditionSerializer,
     RoadInventorySerializer,
     TrafficVolumeSerializer,
-    FormDataSerializer
+    FormDataSerializer,
+    TrafficWeightingFactorsSerializer,
+    DRPSerializer,
+    AlignmentSerializer,
+    RoadHazardSerializer
 )
 
 def clean_nan_values(data):
@@ -59,7 +63,11 @@ SERIALIZER_MAP = {
     'RoadCondition': RoadConditionSerializer,
     'RoadInventory': RoadInventorySerializer,
     'TrafficVolume': TrafficVolumeSerializer,
-    'FormData': FormDataSerializer
+    'FormData': FormDataSerializer,
+    'TrafficWeightingFactors': TrafficWeightingFactorsSerializer,
+    'DRP': DRPSerializer,
+    'Alignment': AlignmentSerializer,
+    'RoadHazard': RoadHazardSerializer
 }
 
 class UploadDataView(APIView):
@@ -70,10 +78,39 @@ class UploadDataView(APIView):
             data = clean_nan_values(request.data)
             results = {}
             validation_errors = {}
+            form_data_validation_failed = False
 
+            # First check FormData validation
+            if 'FormData' in data:
+                form_data_records = data['FormData']
+                if not isinstance(form_data_records, list):
+                    form_data_records = [form_data_records]
+                
+                for i, record in enumerate(form_data_records):
+                    record = {k.lower(): v for k, v in record.items()}
+                    serializer = FormDataSerializer(data=record)
+                    if not serializer.is_valid():
+                        form_data_validation_failed = True
+                        validation_errors[f"FormData_record_{i}"] = {
+                            'record': record,
+                            'errors': serializer.errors
+                        }
+                        break
+
+            # If FormData validation failed, reject all data
+            if form_data_validation_failed:
+                return Response({
+                    'status': 'validation_error',
+                    'message': 'FormData validation failed - rejecting all data',
+                    'errors': validation_errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Process other models
             for model_name, records in data.items():
+                if model_name == 'FormData':
+                    continue  # Skip FormData as it's already processed
+                    
                 try:
-                    # Skip if records is not a list
                     if not isinstance(records, list):
                         continue
                         
@@ -88,11 +125,7 @@ class UploadDataView(APIView):
 
                     processed_records = []
                     for record in records:
-                        # Convert all keys to lowercase
                         record = {k.lower(): v for k, v in record.items()}
-                        # Generate admin_code if needed
-                        #record = generate_admin_code(record)
-
                         if 'province_code' in record and 'kabupaten_code' in record:
                             province_code = record['province_code']
                             kabupaten_code = record['kabupaten_code']
@@ -101,9 +134,9 @@ class UploadDataView(APIView):
                         processed_records.append(record)
 
                     objects = []
+                    model_validation_errors = {}
                     for i, record in enumerate(processed_records):
                         try:
-                            # Check if record has an ID and if it exists in the database
                             record_id = record.get('id')
                             if record_id is not None:
                                 try:
@@ -113,46 +146,45 @@ class UploadDataView(APIView):
                                         obj = serializer.save()
                                         objects.append(obj)
                                     else:
-                                        validation_errors[f"{model_name}_record_{i}"] = {
+                                        model_validation_errors[f"{model_name}_record_{i}"] = {
                                             'record': record,
                                             'errors': serializer.errors
                                         }
                                 except model.DoesNotExist:
-                                    # If record doesn't exist, create new one
                                     serializer = serializer_class(data=record)
                                     if serializer.is_valid():
                                         obj = serializer.save()
                                         objects.append(obj)
                                     else:
-                                        validation_errors[f"{model_name}_record_{i}"] = {
+                                        model_validation_errors[f"{model_name}_record_{i}"] = {
                                             'record': record,
                                             'errors': serializer.errors
                                         }
                             else:
-                                # If no ID provided, create new record
                                 serializer = serializer_class(data=record)
                                 if serializer.is_valid():
                                     obj = serializer.save()
                                     objects.append(obj)
                                 else:
-                                    validation_errors[f"{model_name}_record_{i}"] = {
+                                    model_validation_errors[f"{model_name}_record_{i}"] = {
                                         'record': record,
                                         'errors': serializer.errors
                                     }
                         except ValidationError as e:
-                            validation_errors[f"{model_name}_record_{i}"] = {
+                            model_validation_errors[f"{model_name}_record_{i}"] = {
                                 'record': record,
                                 'errors': str(e)
                             }
 
-                    if validation_errors:
+                    if model_validation_errors:
                         results[model_name] = {
                             'status': 'validation_error',
-                            'errors': validation_errors
+                            'errors': model_validation_errors
                         }
+                        validation_errors.update(model_validation_errors)
                     else:
                         results[model_name] = {
-                            'status': 'validated',
+                            'status': 'success',
                             'objects': serializer_class(objects, many=True).data
                         }
 
@@ -162,16 +194,31 @@ class UploadDataView(APIView):
                         'message': str(e)
                     }
 
+            # Check if any model had validation errors
             has_validation_errors = any(result.get('status') == 'validation_error' for result in results.values())
-
+            
             if has_validation_errors:
+                # Extract only the errors from results
+                error_details = {
+                    model: result['errors']
+                    for model, result in results.items()
+                    if result.get('status') == 'validation_error'
+                }
+                
                 return Response({
-                    'status': 'validation_error',
-                    'message': 'One or more records failed validation',
-                    'details': results
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            return Response(results, status=status.HTTP_201_CREATED)
+                    'status': 'partial_success',
+                    'message': 'Some records failed validation',
+                    'errors': error_details,
+                    'successful_models': [
+                        model for model, result in results.items()
+                        if result.get('status') == 'success'
+                    ]
+                }, status=status.HTTP_207_MULTI_STATUS)
+            
+            return Response({
+                'status': 'success',
+                'message': 'All data processed successfully'
+            }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

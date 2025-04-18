@@ -19,7 +19,11 @@ from .models import (
     RoadCondition,
     RoadInventory,
     TrafficVolume,
-    FormData 
+    FormData,
+    TrafficWeightingFactors,
+    DRP,
+    Alignment,
+    RoadHazard
 )
 
 
@@ -42,3 +46,8 @@ admin.site.register(RoadCondition)
 admin.site.register(RoadInventory)
 admin.site.register(TrafficVolume)
 admin.site.register(FormData)
+admin.site.register(TrafficWeightingFactors)
+admin.site.register(DRP)
+admin.site.register(Alignment)
+admin.site.register(RoadHazard)
+    

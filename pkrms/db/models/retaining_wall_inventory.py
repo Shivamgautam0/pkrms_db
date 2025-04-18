@@ -3,9 +3,9 @@ from django.forms import ValidationError
 from .link import Link
 
 class RetainingWallInventory(models.Model):
-    id = models.AutoField(primary_key=True,db_column='id')
+    # id = models.AutoField(primary_key=True,db_column='id')
     admin_code = models.CharField(max_length=255,db_column='adminCode')
-    link_no = models.CharField(max_length=50,db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
     wall_number = models.CharField(max_length=255, null=True, blank=True, db_column='wallNumber')
     wall_side = models.CharField(max_length=255, null=True, blank=True, db_column='wallSide')
     chainagefrom = models.CharField( max_length=255,null=True, blank=True, db_column='chainageFrom')

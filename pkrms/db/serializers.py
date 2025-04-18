@@ -18,7 +18,11 @@ from .models import (
     RoadCondition,
     RoadInventory,
     TrafficVolume,
-    FormData
+    FormData,
+    TrafficWeightingFactors,
+    DRP,
+    Alignment,
+    RoadHazard
 )
 
 class BridgeInventorySerializer(serializers.ModelSerializer):
@@ -112,27 +116,27 @@ class TrafficVolumeSerializer(serializers.ModelSerializer):
         fields = '__all__' 
 
 class FormDataSerializer(serializers.ModelSerializer):
-    selectedProvince = serializers.CharField(source='selected_province', required=False)
-    selectedKabupaten = serializers.CharField(source='selected_kabupaten', required=False)
-    lgName = serializers.CharField(source='lg_name', required=False)
-
     class Meta:
         model = FormData
         fields = '__all__'
-        extra_kwargs = {
-            'selected_province': {'required': True},
-            'lg_name': {'required': True},
-            'email': {'required': True},
-            'phone': {'required': True},
-            'status': {'required': True}
-        }
+        
 
-    def to_internal_value(self, data):
-        # Convert camelCase to snake_case
-        if 'selectedProvince' in data:
-            data['selected_province'] = data.pop('selectedProvince')
-        if 'selectedKabupaten' in data:
-            data['selected_kabupaten'] = data.pop('selectedKabupaten')
-        if 'lgName' in data:
-            data['lg_name'] = data.pop('lgName')
-        return super().to_internal_value(data)
+class TrafficWeightingFactorsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrafficWeightingFactors
+        fields = '__all__'
+
+class DRPSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DRP
+        fields = '__all__'
+
+class AlignmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Alignment
+        fields = '__all__'
+
+class RoadHazardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoadHazard
+        fields = '__all__'  

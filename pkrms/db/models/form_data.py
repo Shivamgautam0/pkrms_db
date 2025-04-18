@@ -2,13 +2,13 @@ from django.db import models
 from django.core.exceptions import ValidationError
 
 class FormData(models.Model):
-    id = models.AutoField(primary_key=True, db_column='id')
+    # id = models.AutoField(primary_key=True, db_column='id')
     status = models.CharField(max_length=50, db_column='status')
     selected_province = models.CharField(max_length=100, db_column='selectedProvince')
     selected_kabupaten = models.CharField(max_length=100, null=True, blank=True, db_column='selectedKabupaten')
     lg_name = models.CharField(max_length=100, db_column='lgName')
     email = models.EmailField(db_column='email')
-    phone = models.CharField(max_length=20, db_column='phone')
+    phone = models.CharField(max_length=19, db_column='phone')
 
     def clean(self):
         required_fields = [

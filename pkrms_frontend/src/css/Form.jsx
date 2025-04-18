@@ -10,8 +10,6 @@ function Form() {
   const [selectedKabupaten, setSelectedKabupaten] = useState("");
   const [provinces, setProvinces] = useState([]);
   const [kabupatenList, setKabupatenList] = useState([]);
-  const [errors, setErrors] = useState(null);
-  const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
 
   const [FormData, setFormData] = useState({
     provincial: { lgName: "", email: "", phone: "" },
@@ -84,14 +82,8 @@ function Form() {
       setFiles((prev) => ({ ...prev, [key]: file }));
       setExcelJson((prev) => ({ ...prev, [key]: allData[workbook.SheetNames[0]] }));
     } catch (error) {
-      console.error('Error reading Excel file:', error);
-      setErrors({ 
-        fileError: { 
-          title: 'File Error', 
-          errors: { [key]: `Error reading Excel file: ${error.message}` } 
-        } 
-      });
-      setIsErrorPopupOpen(true);
+      alert("Error reading Excel file. Please check the file format.");
+      console.error(error);
     }
   }, []);
 
@@ -105,44 +97,34 @@ function Form() {
   }, []);
 
   const validateInputs = () => {
-    const errors = {};
-
-    if (!status) {
-      errors.status = 'Please select a status';
+    if (
+      !status ||
+      !selectedProvince ||
+      (status === "kabupaten" && !selectedKabupaten)
+    ) {
+      alert("Please fill out all dropdown fields.");
+      return false;
     }
 
-    if (!selectedProvince) {
-      errors.province = 'Please select a province';
+    const { lgName, email, phone } = FormData[status];
+
+    // LG Name validation
+    if (!lgName.trim()) {
+      alert("LG Name is required.");
+      return false;
     }
 
-    if (status === "kabupaten" && !selectedKabupaten) {
-      errors.kabupaten = 'Please select a kabupaten';
-    }
-
-    const { lgName, email, phone } = FormData[status] || {};
-
-    if (!lgName?.trim()) {
-      errors.lgName = 'LG Name is required';
-    }
-
+    // Email validation
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
-      errors.email = 'Please enter a valid email address';
+      alert("Please enter a valid email address (e.g., example@domain.com)");
+      return false;
     }
 
+    // Phone number validation (only digits, min 9 max 14 characters)
     const phoneRegex = /^[0-9]{9,14}$/;
-    if (!phoneRegex.test(phone?.replace(/^\+62/, ''))) {
-      errors.phone = 'Phone number must be 9 to 14 digits';
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setErrors({
-        formValidation: {
-          title: 'Form Validation Errors',
-          errors: errors
-        }
-      });
-      setIsErrorPopupOpen(true);
+    if (!phoneRegex.test(phone.replace(/^\+62/, ''))) {
+      alert("Phone number must be 9 to 14 digits and contain only numbers.");
       return false;
     }
 
@@ -167,17 +149,19 @@ function Form() {
       phone: prependPrefix(currentFormData.phone)
     };
     
+    // Create the data structure with FormData as an array
     const jsonData = {
-      FormData: [preparedFormData]
+      FormData: [preparedFormData]  // Wrap FormData in an array
     };
 
+    // Add Excel data for each file
     Object.entries(excelJson).forEach(([key, data]) => {
       if (data && Array.isArray(data)) {
         jsonData[key] = data;
       }
     });
 
-    console.log('Submitting data:', jsonData);
+    console.log('Sending data:', jsonData); // Log the data being sent
 
     try {
       const response = await fetch('http://127.0.0.1:8000/api/upload-data/', {
@@ -189,84 +173,32 @@ function Form() {
       });
 
       const responseData = await response.json();
-      console.log('Server response:', responseData);
+      console.log('Response from server:', responseData); // Log the complete response
 
       if (!response.ok) {
-        if (responseData.status === 'validation_error') {
-          const fileErrors = responseData.details?.file_errors || {};
-          const formErrors = responseData.details?.FormData || {};
-        
-          let messages = [];
-          let formattedErrors = {};
-        
-          // FormData Errors
-          if (formErrors.errors) {
-            messages.push("Form Errors:");
-            formattedErrors.FormData = {
-              title: "Form Errors",
-              errors: {}
-            };
-            for (const [field, error] of Object.entries(formErrors.errors)) {
-              messages.push(`- ${field}: ${error.errors.join(", ")}`);
-              formattedErrors.FormData.errors[field] = error.errors.join(", ");
-            }
+        // If there are validation errors, show them
+        if (responseData.details && responseData.details.FormData) {
+          const formDataErrors = responseData.details.FormData;
+          if (formDataErrors.status === 'validation_error') {
+            const errorMessages = Object.values(formDataErrors.errors)
+              .map(error => error.errors)
+              .join('\n');
+            throw new Error(`Validation errors:\n${errorMessages}`);
           }
-        
-          // File Errors
-          if (Object.keys(fileErrors).length > 0) {
-            messages.push("File Errors:");
-            for (const [fileName, records] of Object.entries(fileErrors)) {
-              formattedErrors[fileName] = {
-                title: `${fileName} Errors`,
-                errors: {}
-              };
-              records.forEach((err) => {
-                const message = `${err.field} - ${err.message}`;
-                messages.push(`- ${fileName}_record_${err.record}: ${message}`);
-                formattedErrors[fileName].errors[`Record ${err.record}`] = message;
-              });
-            }
-          }
-
-          console.group('Validation Errors');
-          console.log('Response Status:', response.status);
-          console.log('Error Details:', formattedErrors);
-          console.groupEnd();
-          
-          setErrors(formattedErrors);
-          setIsErrorPopupOpen(true);
-          return;
         }
-        
         throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
       }
 
-      // Check the response status
-      if (responseData.status === 'success') {
-        console.log('Data submitted successfully!');
+      // Check if FormData was successfully processed
+      if (responseData.FormData && responseData.FormData.status === 'validated') {
         alert('Data submitted successfully!');
-      } else if (responseData.status === 'partial_success') {
-        console.group('Partial Success - Some records failed validation');
-        console.log('Successful Models:', responseData.successful_models);
-        console.log('Error Details:', responseData.errors);
-        console.groupEnd();
-        
-        setErrors(responseData.errors);
-        setIsErrorPopupOpen(true);
       } else {
-        console.warn('Unexpected response status:', responseData);
-        setErrors({ general: 'Unexpected response from server' });
-        setIsErrorPopupOpen(true);
+        console.warn('FormData processing status:', responseData.FormData);
+        alert('Data was received but there might be an issue with processing. Check console for details.');
       }
     } catch (error) {
-      console.group('Error Details');
-      console.error('Error Type:', error.name);
-      console.error('Error Message:', error.message);
-      console.error('Stack Trace:', error.stack);
-      console.groupEnd();
-      
-      setErrors({ general: error.message });
-      setIsErrorPopupOpen(true);
+      console.error('Error details:', error);
+      alert(`Error submitting data: ${error.message}`);
     }
 
     setOutput(jsonData);
@@ -285,14 +217,14 @@ function Form() {
         placeholder="LG Name"
         value={FormData[type].lgName}
         onChange={(e) => handleInputChange(e, type, "lgName")}
-        className={`input-field ${errors?.formValidation?.errors?.lgName ? 'input-error' : ''}`}
+        className="input-field"
       />
       <input
         type="email"
         placeholder="Email"
         value={FormData[type].email}
         onChange={(e) => handleInputChange(e, type, "email")}
-        className={`input-field ${errors?.formValidation?.errors?.email ? 'input-error' : ''}`}
+        className="input-field"
       />
 
       <span className="phone-prefix">+62</span>
@@ -301,7 +233,7 @@ function Form() {
         placeholder="Phone Number"
         value={FormData[type].phone}
         onChange={(e) => handleInputChange(e, type, "phone")}
-        className={`input-field ${errors?.formValidation?.errors?.phone ? 'input-error' : ''}`}
+        className="input-field"
       />
     </motion.div>
   );
@@ -324,7 +256,7 @@ function Form() {
               setSelectedKabupaten("");
               setKabupatenList([]);
             }}
-            className={`select-status small-select ${errors?.formValidation?.errors?.status ? 'input-error' : ''}`}
+            className="select-status small-select"
           >
             <option value="">-- Select --</option>
             <option value="provincial">Provincial</option>
@@ -335,7 +267,7 @@ function Form() {
             <select
               value={selectedProvince}
               onChange={handleProvinceChange}
-              className={`select-status small-select ${errors?.formValidation?.errors?.province ? 'input-error' : ''}`}
+              className="select-status small-select"
             >
               <option value="">-- Select Province --</option>
               {provinces.map((prov) => (
@@ -350,7 +282,7 @@ function Form() {
             <select
               value={selectedKabupaten}
               onChange={(e) => setSelectedKabupaten(e.target.value)}
-              className={`select-status small-select ${errors?.formValidation?.errors?.kabupaten ? 'input-error' : ''}`}
+              className="select-status small-select"
               disabled={!kabupatenList.length}
             >
               <option value="">-- Select Kabupaten --</option>
@@ -368,7 +300,25 @@ function Form() {
       <div className="form-section">
         <h3 className="section-title">Upload Excel Files</h3>
         <div className="file-upload-grid">
-          {Object.keys(files).map((key) => (
+          {[
+            "BridgeInventory",
+            "CODE_AN_Parameters",
+            "CODE_AN_UnitCostsPER",
+            "CODE_AN_UnitCostsPERUnpaved",
+            "CODE_AN_UnitCostsREH",
+            "CODE_AN_UnitCostsRIGID",
+            "CODE_AN_UnitCostsRM",
+            "CODE_AN_UnitCostsUPGUnpaved",
+            "CODE_AN_UnitCostsWidening",
+            "CODE_AN_WidthStandards",
+            "CulvertCondition",
+            "CulvertInventory",
+            "Link",
+            "RetainingWallInventory",
+            "RoadInventory",
+            "TrafficVolume",
+            "RoadCondition",
+          ].map((key, index) => (
             <div key={key} className="file-upload-card">
               <div className="file-content">
                 {!files[key] ? (
@@ -412,33 +362,6 @@ function Form() {
           </div>
         )}
       </div>
-
-      {errors && isErrorPopupOpen && (
-        <div className="error-popup-overlay" onClick={() => setIsErrorPopupOpen(false)}>
-          <div className="error-popup-content" onClick={(e) => e.stopPropagation()}>
-            <div className="error-popup-header">
-              <h2>Validation Errors</h2>
-              <button className="close-button" onClick={() => setIsErrorPopupOpen(false)}>×</button>
-            </div>
-            <div className="error-popup-body">
-              {Object.entries(errors).map(([key, value]) => (
-                <div key={key} className="error-section">
-                  <h3>{value.title || key}</h3>
-                  {Object.entries(value.errors || {}).map(([field, error]) => (
-                    <div key={field} className="field-error">
-                      <span className="field-name">{field}:</span>
-                      <span className="error-message">{error}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-            <div className="error-popup-footer">
-              <button onClick={() => setIsErrorPopupOpen(false)} className="close-button">Close</button>
-            </div>
-          </div>
-        </div>
-      )}
     </motion.div>
   );
 }

@@ -6,7 +6,7 @@ class RoadCondition(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
     year = models.CharField(max_length=255, db_column='year', null=False, blank=False)
     admin_code = models.CharField(max_length=255, db_column='adminCode', null=False, blank=False)
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo',to_field='link_no')
     chainagefrom = models.CharField(max_length=255, db_column='chainageFrom', null=False, blank=False)
     chainageto = models.CharField(max_length=255, db_column='chainageTo', null=False, blank=False)
     roughness = models.CharField(max_length=255, db_column='roughness', null=True, blank=True)

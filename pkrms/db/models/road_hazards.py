@@ -4,7 +4,7 @@ from .link import Link
 class RoadHazard(models.Model):
     year = models.CharField(max_length=255, null=False, blank=False, db_column='year')
     admin_code = models.CharField(max_length=255, null=False, blank=False, db_column='adminCode')
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo',to_field='link_no')
     chainage_from = models.CharField(max_length=255, null=False, blank=False, db_column='chainageFrom')
     chainage_to = models.CharField(max_length=255, null=False, blank=False, db_column='chainageTo')
     hazard_type = models.CharField(max_length=255, null=False, blank=False, db_column='hazardType')

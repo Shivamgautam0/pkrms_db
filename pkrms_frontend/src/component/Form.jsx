@@ -12,6 +12,8 @@ function Form() {
   const [kabupatenList, setKabupatenList] = useState([]);
   const [errors, setErrors] = useState(null);
   const [isErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState(null);
+  const [showAllErrors, setShowAllErrors] = useState(false);
 
   const [FormData, setFormData] = useState({
     provincial: { lgName: "", email: "", phone: "" },
@@ -177,6 +179,7 @@ function Form() {
       }
     });
 
+    console.group('Form Submission');
     console.log('Submitting data:', jsonData);
 
     try {
@@ -196,44 +199,37 @@ function Form() {
           const fileErrors = responseData.details?.file_errors || {};
           const formErrors = responseData.details?.FormData || {};
         
-          let messages = [];
           let formattedErrors = {};
         
           // FormData Errors
           if (formErrors.errors) {
-            messages.push("Form Errors:");
             formattedErrors.FormData = {
+              type: 'validation_error',
               title: "Form Errors",
               errors: {}
             };
             for (const [field, error] of Object.entries(formErrors.errors)) {
-              messages.push(`- ${field}: ${error.errors.join(", ")}`);
               formattedErrors.FormData.errors[field] = error.errors.join(", ");
             }
           }
         
           // File Errors
           if (Object.keys(fileErrors).length > 0) {
-            messages.push("File Errors:");
             for (const [fileName, records] of Object.entries(fileErrors)) {
               formattedErrors[fileName] = {
+                type: 'validation_error',
                 title: `${fileName} Errors`,
                 errors: {}
               };
               records.forEach((err) => {
                 const message = `${err.field} - ${err.message}`;
-                messages.push(`- ${fileName}_record_${err.record}: ${message}`);
                 formattedErrors[fileName].errors[`Record ${err.record}`] = message;
               });
             }
           }
-
-          console.group('Validation Errors');
-          console.log('Response Status:', response.status);
-          console.log('Error Details:', formattedErrors);
-          console.groupEnd();
           
           setErrors(formattedErrors);
+          setSubmissionStatus('error');
           setIsErrorPopupOpen(true);
           return;
         }
@@ -241,34 +237,98 @@ function Form() {
         throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
       }
 
-      // Check the response status
+      // Handle success response
       if (responseData.status === 'success') {
-        console.log('Data submitted successfully!');
-        alert('Data submitted successfully!');
-      } else if (responseData.status === 'partial_success') {
-        console.group('Partial Success - Some records failed validation');
-        console.log('Successful Models:', responseData.successful_models);
-        console.log('Error Details:', responseData.errors);
+        console.group('Success Response');
+        console.log('Full Response:', responseData);
+        console.log('Status:', responseData.status);
+        console.log('Message:', responseData.message);
         console.groupEnd();
+
+        setSubmissionStatus('success');
+        setErrors({
+          success: {
+            type: 'success',
+            title: 'Success',
+            errors: {
+              message: responseData.message
+            }
+          }
+        });
+        setIsErrorPopupOpen(true);
+      } else if (responseData.status === 'partial_success') {
+        console.log('Partial Success:', responseData);
+        const formattedErrors = {};
         
-        setErrors(responseData.errors);
+        // Format successful models
+        if (responseData.successful_models && responseData.successful_models.length > 0) {
+          formattedErrors.successful_models = {
+            type: 'success',
+            title: 'Successfully Processed Models',
+            errors: {}
+          };
+          responseData.successful_models.forEach(model => {
+            formattedErrors.successful_models.errors[model] = 'Successfully processed';
+            console.log(`Successfully processed model: ${model}`);
+          });
+        } else {
+          console.log('No successful models found');
+        }
+        
+        // Format error details
+        if (responseData.errors) {
+          Object.entries(responseData.errors).forEach(([model, records]) => {
+            formattedErrors[model] = {
+              type: 'validation_error',
+              title: `${model} Errors`,
+              errors: {}
+            };
+            
+            Object.entries(records).forEach(([recordKey, errorData]) => {
+              const recordNumber = recordKey.split('_').pop();
+              const errorMessage = Array.isArray(errorData.errors) 
+                ? errorData.errors.join(', ') 
+                : Object.entries(errorData.errors)
+                    .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+                    .join('; ');
+              
+              formattedErrors[model].errors[`Record ${recordNumber}`] = errorMessage;
+              console.log(`Error in ${model} - Record ${recordNumber}:`, errorMessage);
+            });
+          });
+        } else {
+          console.log('No errors found');
+        }
+        
+        setSubmissionStatus('partial_success');
+        setErrors(formattedErrors);
         setIsErrorPopupOpen(true);
       } else {
         console.warn('Unexpected response status:', responseData);
-        setErrors({ general: 'Unexpected response from server' });
+        setSubmissionStatus('error');
+        setErrors({ 
+          general: { 
+            type: 'error',
+            title: 'Unexpected Error',
+            errors: { message: 'Unexpected response from server' }
+          } 
+        });
         setIsErrorPopupOpen(true);
       }
     } catch (error) {
-      console.group('Error Details');
-      console.error('Error Type:', error.name);
-      console.error('Error Message:', error.message);
-      console.error('Stack Trace:', error.stack);
-      console.groupEnd();
-      
-      setErrors({ general: error.message });
+      console.error('Error:', error);
+      setSubmissionStatus('error');
+      setErrors({ 
+        general: { 
+          type: 'error',
+          title: 'Error',
+          errors: { message: error.message }
+        } 
+      });
       setIsErrorPopupOpen(true);
     }
 
+    console.groupEnd();
     setOutput(jsonData);
   };
 
@@ -305,6 +365,118 @@ function Form() {
       />
     </motion.div>
   );
+
+  const ErrorPopup = ({ errors, status, onClose }) => {
+    const [expandedSections, setExpandedSections] = useState({});
+    const [showAllRecords, setShowAllRecords] = useState({});
+
+    const toggleSection = (sectionKey) => {
+      setExpandedSections(prev => ({
+        ...prev,
+        [sectionKey]: !prev[sectionKey]
+      }));
+    };
+
+    const toggleShowAll = (sectionKey) => {
+      setShowAllRecords(prev => ({
+        ...prev,
+        [sectionKey]: !prev[sectionKey]
+      }));
+    };
+
+    const getErrorTypeColor = (errorType) => {
+      switch (errorType) {
+        case 'validation_error':
+          return '#dc3545';
+        case 'partial_success':
+          return '#ffc107';
+        case 'success':
+          return '#28a745';
+        default:
+          return '#6c757d';
+      }
+    };
+
+    const renderErrorSection = (key, value) => {
+      const errorItems = Object.entries(value.errors || {});
+      const showAll = showAllRecords[key];
+      const displayItems = showAll ? errorItems : errorItems.slice(0, 5);
+      const hasMore = errorItems.length > 5;
+
+      return (
+        <div key={key} className="error-section">
+          <div className="error-section-header" onClick={() => toggleSection(key)}>
+            <h3 style={{ color: getErrorTypeColor(value.type) }}>
+              {value.title || key}
+              {value.type !== 'success' && <span className="error-count">({errorItems.length} items)</span>}
+            </h3>
+            <span className="toggle-icon">{expandedSections[key] ? '▼' : '▶'}</span>
+          </div>
+          {expandedSections[key] && (
+            <div className="error-section-content">
+              {displayItems.map(([field, error], index) => (
+                <div key={index} className="field-error">
+                  <div className="field-header">
+                    <span className="field-name">{field}</span>
+                    {field.includes('record_') && (
+                      <span className="record-number">
+                        Record #{field.split('_').pop()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="error-message">
+                    {typeof error === 'object' ? JSON.stringify(error) : error}
+                  </div>
+                </div>
+              ))}
+              {hasMore && !showAll && (
+                <button 
+                  className="show-more-button"
+                  onClick={() => toggleShowAll(key)}
+                >
+                  Show {errorItems.length - 5} more items
+                </button>
+              )}
+              {hasMore && showAll && (
+                <button 
+                  className="show-less-button"
+                  onClick={() => toggleShowAll(key)}
+                >
+                  Show less
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    if (status === 'success') {
+      return (
+        <div className="success-popup">
+          <div className="success-icon">✓</div>
+          <h2>Success!</h2>
+          <p>{errors?.success?.errors?.message || 'Your data has been submitted successfully.'}</p>
+          <button className="action-button" onClick={onClose}>Close</button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="error-popup-content">
+        <div className="error-popup-header">
+          <h2>Submission Results</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
+        <div className="error-popup-body">
+          {Object.entries(errors).map(([key, value]) => renderErrorSection(key, value))}
+        </div>
+        <div className="error-popup-footer">
+          <button className="action-button" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <motion.div
@@ -416,26 +588,11 @@ function Form() {
       {errors && isErrorPopupOpen && (
         <div className="error-popup-overlay" onClick={() => setIsErrorPopupOpen(false)}>
           <div className="error-popup-content" onClick={(e) => e.stopPropagation()}>
-            <div className="error-popup-header">
-              <h2>Validation Errors</h2>
-              <button className="close-button" onClick={() => setIsErrorPopupOpen(false)}>×</button>
-            </div>
-            <div className="error-popup-body">
-              {Object.entries(errors).map(([key, value]) => (
-                <div key={key} className="error-section">
-                  <h3>{value.title || key}</h3>
-                  {Object.entries(value.errors || {}).map(([field, error]) => (
-                    <div key={field} className="field-error">
-                      <span className="field-name">{field}:</span>
-                      <span className="error-message">{error}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-            <div className="error-popup-footer">
-              <button onClick={() => setIsErrorPopupOpen(false)} className="close-button">Close</button>
-            </div>
+            <ErrorPopup 
+              errors={errors} 
+              status={submissionStatus} 
+              onClose={() => setIsErrorPopupOpen(false)} 
+            />
           </div>
         </div>
       )}

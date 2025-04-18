@@ -4,7 +4,7 @@ from .link import Link
 class Alignment(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
     admin_code = models.CharField(max_length=255,null=False, blank=False, db_column='adminCode')
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE,null=True, blank=True, db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE,null=True, blank=True, db_column='linkNo',to_field='link_no')
     chainage = models.CharField(max_length=255, null=False, blank=False, db_column='chainage')
     chainage_rb = models.CharField(max_length=255, null=True, blank=True, db_column='chainageRb')
     gps_point_north_deg = models.CharField(max_length=255, null=True, blank=True, db_column='gpsPointNorthDeg')

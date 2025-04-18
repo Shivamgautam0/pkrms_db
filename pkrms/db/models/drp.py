@@ -3,7 +3,7 @@ from django.forms import ValidationError
 from .link import Link
 class DRP(models.Model):
     admin_code = models.CharField(max_length=255, null=False, blank=False, db_column='adminCode')
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo',to_field='link_no')
     drp_num = models.CharField(max_length=255, null=False, blank=False, db_column='drpNum')
     chainage = models.CharField(max_length=255, null=True, blank=True, db_column='chainage')
     drp_order = models.CharField(max_length=255, null=True, blank=True, db_column='drpOrder')

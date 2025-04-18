@@ -6,7 +6,7 @@ class TrafficVolume(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
     year = models.CharField(max_length=255, null=False, blank=False, db_column='year')
     admin_code = models.CharField(max_length=255, db_column='adminCode')
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo',to_field='link_no')
     marketday = models.CharField(max_length=255, null=True, blank=True, db_column='marketDay')
     trafficcount = models.CharField(max_length=255,null=True, blank=True, db_column='trafficCount')
     journeytime = models.CharField(max_length=255, null=True, blank=True, db_column='journeyTime')

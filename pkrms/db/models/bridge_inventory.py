@@ -6,7 +6,7 @@ class BridgeInventory(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
     year = models.CharField(max_length=255, db_column='year')
     admin_code = models.CharField(max_length=255, db_column='adminCode')
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo',to_field='link_no')
     bridge_number = models.CharField(max_length=100, db_column='bridgeNumber')
     chainage = models.CharField(max_length=255, db_column='chainage')
     drp_from = models.CharField(max_length=255, null=True, blank=True, db_column='drpFrom')

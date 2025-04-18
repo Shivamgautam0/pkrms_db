@@ -6,7 +6,7 @@ class RetainingWallCondition(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
     year = models.CharField(max_length=255, db_column='year')
     admin_code = models.CharField(max_length=255,db_column='adminCode')
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo',to_field='link_no')
     wall_number = models.CharField(max_length=255,db_column='wallNumber')
     wall_mortar_m2 = models.CharField(max_length=255, null=True, blank=True, db_column='wallMortarM2')
     wall_repair_m3 = models.CharField(max_length=255, null=True, blank=True, db_column='wallRepairM3')

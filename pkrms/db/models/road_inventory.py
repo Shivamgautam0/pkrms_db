@@ -6,7 +6,7 @@ class RoadInventory(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
     admin_code = models.CharField(max_length=255, db_column='adminCode')
     # link_code = models.ForeignKey(Link, on_delete=models.CASCADE, db_column='linkCode')
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo',to_field='link_no')
     chainagefrom = models.CharField(max_length=255, db_column='chainageFrom')
     chainageto = models.CharField(max_length=255, db_column='chainageTo')
     row = models.CharField(max_length=255, db_column='row')

@@ -5,7 +5,7 @@ class CulvertCondition(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
     year = models.CharField(max_length=255, db_column='year')
     admin_code = models.CharField(max_length=255, db_column='adminCode')    
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo',to_field='link_no')
     culvert_number = models.CharField(max_length=100, db_column='culvertNumber')
     cond_barrel = models.CharField(max_length=255, null=True, blank=True, db_column='condBarrel')
     cond_inlet = models.CharField( max_length=255,null=True, blank=True, db_column='condInlet')

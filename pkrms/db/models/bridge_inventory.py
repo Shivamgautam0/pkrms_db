@@ -57,27 +57,47 @@ class BridgeInventory(models.Model):
     analysisbaseyear = models.CharField(max_length=255, null=True, blank=True, db_column='analysisBaseYear')
     surveyby = models.CharField(max_length=255, null=True, blank=True, db_column='surveyBy')
 
-    # @classmethod
-    # def create_with_admin_code(cls, province_code, kabupaten_code, **kwargs):
-       
-    #     admin_code = int(f"{province_code}{kabupaten_code:02d}")
-    #     return cls(admin_code=admin_code, **kwargs)
 
     def clean(self):
-        required_fields = [
-            self.admin_code,
-            self.year,
-            self.chainage,
-            self.link_no,
-            self.bridge_number,
-            self.bridge_length,
-            self.bridge_type
-        ]
-        if any(field is None for field in required_fields):
-            raise ValidationError("All required fields must be filled")
+        errors = {}
+        if not self.admin_code:
+            errors['admin_code'] = 'Province Code and Kabupaten Code is required.'    
+        if not self.year:
+            errors['year'] = 'This field is required.'
+        if not self.link_no:
+            errors['link_no'] = 'This field is required.'
+        if not self.bridge_number:
+            errors['bridge_number'] = 'This field is required.'
+        if not self.chainage:
+            errors['chainage'] = 'This field is required.'
+        if not self.bridge_length:
+            errors['bridge_length'] = 'This field is required.'
+        if not self.bridge_type:
+            errors['bridge_type'] = 'This field is required.'
+        if errors:
+            raise ValidationError(errors)
+            
+        # Check if this is not the first record for this link
+        if self.pk:  # If this is an existing record
+            # Get the previous record for this link
+            previous_record = BridgeInventory.objects.filter(
+                link_no=self.link_no,
+                chainage__lt=self.chainage
+            ).order_by('-chainage').first()
+            
+            if previous_record and float(self.chainage) < float(previous_record.chainage):
+                raise ValidationError(f"Starting chainage ({self.chainage}) must not be less than ending chainage ({previous_record.chainage}) of previous record")
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        # Skip chainage validation for the first record of a link
+        if not self.pk:  # If this is a new record
+            existing_records = BridgeInventory.objects.filter(link_no=self.link_no).exists()
+            if not existing_records:  # If this is the first record for this link
+                self.full_clean(exclude=['chainage'])  # Skip chainage validation
+            else:
+                self.full_clean()
+        else:
+            self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):

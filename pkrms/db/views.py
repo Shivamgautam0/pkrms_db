@@ -5,6 +5,7 @@ from rest_framework import status
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from .parsers import CustomJSONParser
+from .models.form_data import FormData
 import math
 import numpy as np
 from .utils.helpers import generate_admin_code
@@ -42,6 +43,29 @@ def clean_nan_values(data):
     elif isinstance(data, float) and (math.isnan(data) or np.isnan(data)):
         return None
     return data
+
+def standardize_field_names(record):
+    """Convert all field names to lowercase and handle special cases"""
+    standardized = {}
+    for key, value in record.items():
+        # Convert to lowercase and handle special cases
+        new_key = key.lower()
+        if new_key in ['id', 'pk']:
+            new_key = 'id'
+        standardized[new_key] = value
+    return standardized
+
+def process_admin_code(record):
+    """Generate admin_code if province_code and kabupaten_code are present"""
+    if 'province_code' in record and 'kabupaten_code' in record:
+        province_code = record['province_code']
+        kabupaten_code = record['kabupaten_code']
+        if province_code is not None and kabupaten_code is not None:
+            try:
+                record['admin_code'] = int(f"{int(province_code)}{int(kabupaten_code):02d}")
+            except (ValueError, TypeError):
+                pass
+    return record
 
 # Map model names to their serializers
 SERIALIZER_MAP = {
@@ -86,24 +110,48 @@ class UploadDataView(APIView):
                 if not isinstance(form_data_records, list):
                     form_data_records = [form_data_records]
                 
+                form_data_objects = []
                 for i, record in enumerate(form_data_records):
-                    record = {k.lower(): v for k, v in record.items()}
+                    record = standardize_field_names(record)
                     serializer = FormDataSerializer(data=record)
                     if not serializer.is_valid():
+                        # Check if the error is due to unique constraint
+                        if 'non_field_errors' in serializer.errors and 'unique set' in str(serializer.errors['non_field_errors']):
+                            # If it's a duplicate, try to get the existing record
+                            try:
+                                existing_record = FormData.objects.get(
+                                    admin_code=record.get('admin_code'),
+                                    email=record.get('email')
+                                )
+                                form_data_objects.append(existing_record)
+                                continue  # Skip to next record
+                            except FormData.DoesNotExist:
+                                pass
+                        
                         form_data_validation_failed = True
-                        validation_errors[f"FormData_record_{i}"] = {
+                        validation_errors[f"FormData_record_{i+2}"] = {
                             'record': record,
                             'errors': serializer.errors
                         }
                         break
+                    else:
+                        form_data_objects.append(serializer.save())
 
-            # If FormData validation failed, reject all data
+            # If FormData validation failed for non-unique constraint reasons, reject all data
             if form_data_validation_failed:
                 return Response({
                     'status': 'validation_error',
                     'message': 'FormData validation failed - rejecting all data',
                     'errors': validation_errors
                 }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Add FormData results if validation passed or if we found existing records
+            if form_data_objects:
+                results['FormData'] = {
+                    'status': 'success',
+                    'count': len(form_data_objects),
+                    'objects': FormDataSerializer(form_data_objects, many=True).data
+                }
 
             # Process other models
             for model_name, records in data.items():
@@ -125,15 +173,11 @@ class UploadDataView(APIView):
 
                     processed_records = []
                     for record in records:
-                        record = {k.lower(): v for k, v in record.items()}
-                        if 'province_code' in record and 'kabupaten_code' in record:
-                            province_code = record['province_code']
-                            kabupaten_code = record['kabupaten_code']
-                            if province_code is not None and kabupaten_code is not None:
-                                record['admin_code'] = int(f"{int(province_code)}{int(kabupaten_code):02d}")
+                        record = standardize_field_names(record)
+                        record = process_admin_code(record)
                         processed_records.append(record)
 
-                    objects = []
+                    # First validate all records
                     model_validation_errors = {}
                     for i, record in enumerate(processed_records):
                         try:
@@ -142,51 +186,72 @@ class UploadDataView(APIView):
                                 try:
                                     existing_obj = model.objects.get(id=record_id)
                                     serializer = serializer_class(existing_obj, data=record, partial=True)
-                                    if serializer.is_valid():
-                                        obj = serializer.save()
-                                        objects.append(obj)
-                                    else:
-                                        model_validation_errors[f"{model_name}_record_{i}"] = {
-                                            'record': record,
-                                            'errors': serializer.errors
-                                        }
                                 except model.DoesNotExist:
                                     serializer = serializer_class(data=record)
-                                    if serializer.is_valid():
-                                        obj = serializer.save()
-                                        objects.append(obj)
-                                    else:
-                                        model_validation_errors[f"{model_name}_record_{i}"] = {
-                                            'record': record,
-                                            'errors': serializer.errors
-                                        }
                             else:
                                 serializer = serializer_class(data=record)
-                                if serializer.is_valid():
-                                    obj = serializer.save()
-                                    objects.append(obj)
-                                else:
-                                    model_validation_errors[f"{model_name}_record_{i}"] = {
-                                        'record': record,
-                                        'errors': serializer.errors
-                                    }
+                            
+                            if not serializer.is_valid():
+                                model_validation_errors[f"{model_name}_record_{i+2}"] = {
+                                    'record': record,
+                                    'errors': serializer.errors
+                                }
                         except ValidationError as e:
-                            model_validation_errors[f"{model_name}_record_{i}"] = {
+                            model_validation_errors[f"{model_name}_record_{i+2}"] = {
                                 'record': record,
                                 'errors': str(e)
                             }
 
+                    # If any validation errors, reject all records for this model
                     if model_validation_errors:
                         results[model_name] = {
                             'status': 'validation_error',
+                            'message': f'Validation failed for {model_name} - rejecting all records',
                             'errors': model_validation_errors
                         }
                         validation_errors.update(model_validation_errors)
-                    else:
+                        continue
+
+                    # If all validations passed, save all records
+                    objects = []
+                    for record in processed_records:
+                        try:
+                            record_id = record.get('id')
+                            if record_id is not None:
+                                try:
+                                    existing_obj = model.objects.get(id=record_id)
+                                    serializer = serializer_class(existing_obj, data=record, partial=True)
+                                except model.DoesNotExist:
+                                    serializer = serializer_class(data=record)
+                            else:
+                                serializer = serializer_class(data=record)
+                            
+                            if serializer.is_valid():
+                                obj = serializer.save()
+                                objects.append(obj)
+                            else:
+                                raise ValidationError(serializer.errors)
+                        except ValidationError as e:
+                            model_validation_errors[f"{model_name}_record_{processed_records.index(record)+2}"] = {
+                                'record': record,
+                                'errors': str(e)
+                            }
+                            break  # Stop processing if any record fails
+
+                    if model_validation_errors:
                         results[model_name] = {
-                            'status': 'success',
-                            'objects': serializer_class(objects, many=True).data
+                            'status': 'validation_error',
+                            'message': f'Validation failed for {model_name} - rejecting all records',
+                            'errors': model_validation_errors
                         }
+                        validation_errors.update(model_validation_errors)
+                        continue
+
+                    results[model_name] = {
+                        'status': 'success',
+                        'count': len(objects),
+                        'objects': serializer_class(objects, many=True).data
+                    }
 
                 except Exception as e:
                     results[model_name] = {
@@ -207,7 +272,7 @@ class UploadDataView(APIView):
                 
                 return Response({
                     'status': 'partial_success',
-                    'message': 'Some records failed validation',
+                    'message': 'Some models failed validation - all records for those models were rejected',
                     'errors': error_details,
                     'successful_models': [
                         model for model, result in results.items()
@@ -217,8 +282,12 @@ class UploadDataView(APIView):
             
             return Response({
                 'status': 'success',
-                'message': 'All data processed successfully'
+                'message': 'All data processed successfully',
+                'results': results
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'status': 'error',
+                'message': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)

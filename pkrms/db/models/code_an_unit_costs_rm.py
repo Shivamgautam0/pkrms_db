@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 
 class CODE_AN_UnitCostsRM(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
@@ -14,6 +15,20 @@ class CODE_AN_UnitCostsRM(models.Model):
     rm_onoff = models.CharField(max_length=100, null=True, blank=True, db_column='rmOnoff')
     rm_reportcategory = models.CharField(max_length=100, null=True, blank=True, db_column='rmReportCategory')
 
+    def clean(self):
+        errors = {}
+        if not self.admin_code:
+            errors['admin_code'] = 'This field is required.'
+        if not self.rm_activity:
+            errors['rm_activity'] = 'This field is required.'
+        if not self.terrain:
+            errors['terrain'] = 'This field is required.'
+        if errors:
+            raise ValidationError(errors)
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+        
     def __str__(self):
         return f"{self.admin_code}"
     

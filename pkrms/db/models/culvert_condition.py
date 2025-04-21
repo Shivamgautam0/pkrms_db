@@ -1,5 +1,5 @@
 from django.db import models
-from django.forms import ValidationError
+from django.core.exceptions import ValidationError
 from .link import Link
 class CulvertCondition(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
@@ -16,14 +16,19 @@ class CulvertCondition(models.Model):
     surveyby = models.CharField(max_length=255, null=True, blank=True, db_column='surveyBy')
 #  year,admin_code, Link_No, Culvert_Number
     def clean(self):
-        required_fields = [
-            self.year,
-            self.admin_code,
-            self.link_no,
-            self.culvert_number
-        ]
-        if any(field is None for field in required_fields):
-            raise ValidationError("All required fields must be filled")
+        # Validate required fields
+        errors = {}
+        if not self.year:
+            errors['year'] = 'This field is required.'
+        if not self.admin_code:
+            errors['admin_code'] = 'This field is required.'
+        if not self.link_no:
+            errors['link_no'] = 'This field is required.'
+        if not self.culvert_number:
+            errors['culvert_number'] = 'This field is required.'
+
+        if errors:
+            raise ValidationError(errors)
     
     def save(self, *args, **kwargs):
         self.full_clean()

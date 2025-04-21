@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 
 class CODE_AN_Parameters(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
@@ -45,8 +46,25 @@ class CODE_AN_Parameters(models.Model):
     tti_reset_per = models.CharField(max_length=255, null=True, blank=True, db_column='tti_reset_per')
     tti_reset_reh = models.CharField(max_length=255, null=True, blank=True, db_column='tti_reset_reh')
 
+    def clean(self):
+        errors = {}
+        if not self.cumesa1:
+            errors['cumesa1'] = 'This field is required.'
+        if not self.cumesa2:
+            errors['cumesa2'] = 'This field is required.'
+            
+        if errors:
+            raise ValidationError(errors)
+    
+    
+    def save(self, *args, **kwargs):
+        try:
+            self.full_clean()
+            super().save(*args, **kwargs)
+        except ValidationError as e:
+            raise e
     def __str__(self):
-        return f"{self.profile_name}"
+        return f"{self.profilename}"
     
     class Meta:
         db_table = 'code_an_parameters'

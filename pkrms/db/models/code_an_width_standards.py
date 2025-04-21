@@ -1,5 +1,5 @@
 from django.db import models
-
+from django.core.exceptions import ValidationError
 class CODE_AN_WidthStandards(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
     status = models.CharField(max_length=100, null=True, blank=True,db_column='status')
@@ -11,6 +11,23 @@ class CODE_AN_WidthStandards(models.Model):
     minwidening = models.CharField(max_length=255, null=True, blank=True,db_column='minWidening')
     maxvcr = models.CharField(max_length=255, null=True, blank=True,db_column='maxVcr')
 
+    def clean(self):
+        # Validate required fields
+        errors = {}
+        if not self.status:
+            errors['status'] = 'This field is required.'
+        if not self.aadt1:
+            errors['aadt1'] = 'This field is required.'
+        if not self.aadt2:
+            errors['aadt2'] = 'This field is required.'
+
+        if errors:
+            raise ValidationError(errors)
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)   
+        
     def __str__(self):
         return f"{self.status}"
     

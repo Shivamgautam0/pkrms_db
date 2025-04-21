@@ -1,3 +1,4 @@
+from django.forms import ValidationError
 from rest_framework import serializers
 from .models import (
     BridgeInventory,
@@ -81,6 +82,17 @@ class CulvertConditionSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class CulvertInventorySerializer(serializers.ModelSerializer):
+    def validate(self, data):
+        try:
+            instance = CulvertInventory(**data)
+            instance.clean()
+        except ValidationError as e:
+            error_message = str(e)
+            if isinstance(e.messages, list) and len(e.messages) > 0:
+                error_message = e.messages[0]
+            raise serializers.ValidationError({'error': error_message})
+        return data
+
     class Meta:
         model = CulvertInventory
         fields = '__all__'
@@ -101,11 +113,35 @@ class RetainingWallInventorySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class RoadConditionSerializer(serializers.ModelSerializer):
+    def validate(self, data):
+        try:
+            instance = RoadCondition(**data)
+            instance.clean()
+        except ValidationError as e:
+            error_message = str(e)
+            if isinstance(e.messages, list) and len(e.messages) > 0:
+                error_message = e.messages[0]
+            raise serializers.ValidationError({'error': error_message})
+        return data
+
     class Meta:
         model = RoadCondition
         fields = '__all__'
 
 class RoadInventorySerializer(serializers.ModelSerializer):
+    def validate(self, data):
+        try:
+            instance = RoadInventory(**data)
+            instance.clean()
+        except ValidationError as e:
+            # Convert the error message to a string without the non_field_errors prefix
+            error_message = str(e)
+            if isinstance(e.messages, list) and len(e.messages) > 0:
+                error_message = e.messages[0]
+            # Return a dictionary with a custom key instead of using non_field_errors
+            raise serializers.ValidationError({'error': error_message})
+        return data
+
     class Meta:
         model = RoadInventory
         fields = '__all__'
@@ -127,16 +163,49 @@ class TrafficWeightingFactorsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class DRPSerializer(serializers.ModelSerializer):
+    def validate(self, data):
+        try:
+            instance = DRP(**data)
+            instance.clean()
+        except ValidationError as e:
+            error_message = str(e)
+            if isinstance(e.messages, list) and len(e.messages) > 0:
+                error_message = e.messages[0]
+            raise serializers.ValidationError({'error': error_message})
+        return data
+
     class Meta:
         model = DRP
         fields = '__all__'
 
 class AlignmentSerializer(serializers.ModelSerializer):
+    def validate(self, data):
+        try:
+            instance = Alignment(**data)
+            instance.clean()
+        except ValidationError as e:
+            error_message = str(e)
+            if isinstance(e.messages, list) and len(e.messages) > 0:
+                error_message = e.messages[0]
+            raise serializers.ValidationError({'error': error_message})
+        return data
+
     class Meta:
         model = Alignment
         fields = '__all__'
 
 class RoadHazardSerializer(serializers.ModelSerializer):
+    def validate(self, data):
+        try:
+            instance = RoadHazard(**data)
+            instance.clean()
+        except ValidationError as e:
+            error_message = str(e)
+            if isinstance(e.messages, list) and len(e.messages) > 0:
+                error_message = e.messages[0]
+            raise serializers.ValidationError({'error': error_message})
+        return data
+
     class Meta:
         model = RoadHazard
         fields = '__all__'  

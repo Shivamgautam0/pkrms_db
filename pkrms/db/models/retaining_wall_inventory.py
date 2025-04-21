@@ -1,5 +1,5 @@
 from django.db import models
-from django.forms import ValidationError
+from django.core.exceptions import ValidationError
 from .link import Link
 
 class RetainingWallInventory(models.Model):
@@ -18,16 +18,40 @@ class RetainingWallInventory(models.Model):
 
 # admin_code , Link_No, Wall_Number
     def clean(self):
-        required_fields = [
-            self.admin_code,
-            self.link_no,
-            self.wall_number
-        ]
-        if any(field is None for field in required_fields):
-            raise ValidationError("All required fields must be filled")
+        # Validate required fields
+        errors = {}
+        if not self.admin_code:
+            errors['admin_code'] = 'This field is required.'
+        if not self.link_no:    
+            errors['link_no'] = 'This field is required.'
+        if not self.wall_number:
+            errors['wall_number'] = 'This field is required.'
+        if not self.chainagefrom:
+            errors['chainagefrom'] = 'This field is required.'
         
+        if errors:
+            raise ValidationError(errors)
+        # Check if this is not the first record for this link
+        if self.pk and self.chainagefrom:  # If this is an existing record with chainage
+            # Get the previous record for this link
+            previous_record = RetainingWallInventory.objects.filter(
+                link_no=self.link_no,
+                chainagefrom__lt=self.chainagefrom
+            ).order_by('-chainagefrom').first()
+            
+            if previous_record and float(self.chainagefrom) < float(previous_record.chainagefrom):
+                raise ValidationError(f"Starting chainage ({self.chainagefrom}) must not be less than ending chainage ({previous_record.chainagefrom}) of previous record")
+
     def save(self, *args, **kwargs):
-        self.full_clean()
+        # Skip chainage validation for the first record of a link
+        if not self.pk:  # If this is a new record
+            existing_records = RetainingWallInventory.objects.filter(link_no=self.link_no).exists()
+            if not existing_records:  # If this is the first record for this link
+                self.full_clean(exclude=['chainagefrom'])  # Skip chainage validation
+            else:
+                self.full_clean()
+        else:
+            self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):

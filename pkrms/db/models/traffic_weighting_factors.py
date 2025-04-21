@@ -1,5 +1,5 @@
 from django.db import models
-from django.forms import ValidationError
+from django.core.exceptions import ValidationError
 
 class TrafficWeightingFactors(models.Model):
     veh_type = models.CharField(max_length=255, null=False, blank=False, db_column='vehType')
@@ -7,11 +7,13 @@ class TrafficWeightingFactors(models.Model):
     vdf_factor = models.CharField(max_length=255, null=True, blank=True, db_column='vdfFactor')
 
     def clean(self):
-        required_fields = [
-            self.veh_type,
-        ]
-        if any(field is None for field in required_fields):
-            raise ValidationError("All required fields must be filled")
+        # Validate required fields
+        errors = {}
+        if not self.veh_type:
+            errors['veh_type'] = 'This field is required.'
+
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.full_clean()

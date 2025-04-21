@@ -1,5 +1,5 @@
 from django.db import models
-from django.forms import ValidationError
+from django.core.exceptions import ValidationError
 from .link import Link
 
 class TrafficVolume(models.Model):
@@ -31,13 +31,21 @@ class TrafficVolume(models.Model):
     #     return cls(admin_code=admin_code, **kwargs)
     
     def clean(self):
-        required_fields = [
-            self.year,
-            self.admin_code,
-            self.link_no
-        ]
-        if any(field is None for field in required_fields):
-            raise ValidationError("All required fields must be filled")
+        # Validate required fields
+        errors = {}
+        if not self.year:
+            errors['year'] = 'This field is required.'
+        if not self.admin_code:
+            errors['admin_code'] = 'This field is required.'
+        if not self.link_no:
+            errors['link_no'] = 'This field is required.'
+        if not self.marketday:
+            errors['marketday'] = 'This field is required.'
+        if not self.trafficcount:
+            errors['trafficcount'] = 'This field is required.'
+
+        if errors:
+            raise ValidationError(errors)
     
     def save(self, *args, **kwargs):
         self.full_clean()

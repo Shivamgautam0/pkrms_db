@@ -18,9 +18,7 @@ function Form() {
   const [provinces, setProvinces] = useState([]);
   const [kabupatenList, setKabupatenList] = useState([]);
 
-  // // Modal states
-  // const [popupMessages, setPopupMessages] = useState([]);
-  // const [setIsErrorPopupOpen, setIsErrorPopupOpen] = useState(false);
+
   // File management states
   const [files, setFiles] = useState({});
   const [excelJson, setExcelJson] = useState({});
@@ -84,8 +82,12 @@ function Form() {
       required: true,
     },
     parameters: {
-      label: "Parameters",
-      files: ["CODE_AN_Parameters", "CODE_AN_WidthStandards"],
+      label: "Parameters & Traffic",
+      files: [
+        "CODE_AN_Parameters",
+        "CODE_AN_WidthStandards",
+        "TrafficWeightingFactors",
+      ],
       enabled: true,
       required: true,
     },
@@ -120,7 +122,7 @@ function Form() {
     "BridgeInventory",
   ]);
 
-  const [trafficFiles] = useState(["TrafficVolume", "TrafficWeightingFactors"]);
+  const [trafficFiles] = useState(["TrafficVolume"]);
 
   // ======== EFFECTS ========
 
@@ -165,7 +167,7 @@ function Form() {
     setSections(prev => {
       // This checks if Link exists AND was successfully uploaded
       const linkSuccessfullyUploaded = !!files['Link'] && uploadedSections['map'];
-      
+
       const updatedMapFiles = prev.map.files.map(file => {
         if (typeof file === 'object') {
           if (file.name === 'Link') {
@@ -178,7 +180,7 @@ function Form() {
         }
         return file;
       });
-      
+
       return {
         ...prev,
         map: {
@@ -460,7 +462,7 @@ function Form() {
       console.error("Section not found:", sectionKey);
       return;
     }
-
+  
     // Validate form inputs first
     if (!validateInputs()) return;
     if (isSubmitting) return;
@@ -468,9 +470,9 @@ function Form() {
       ...prev,
       [sectionKey]: true
     }));
-    
+  
     setIsSubmitting(true);
-
+  
     // Get all required files for this section
     const requiredFiles = section.files
       .filter((file) => {
@@ -478,35 +480,34 @@ function Form() {
         return file.required;
       })
       .map((file) => (typeof file === "string" ? file : file.name));
-
+  
     console.log("Required files:", requiredFiles);
     console.log("Current files state:", files);
-
-    // Check if all required files are present
+  
     // Check if all required files are present
     const missingFiles = requiredFiles.filter((fileKey) => !files[fileKey]);
     if (missingFiles.length > 0) {
       console.log("Missing required files:", missingFiles);
-
-      // This is likely where the issue is - errors aren't being properly formatted
+  
       setErrors({
         unitCosts: {
-          // Use the appropriate section name
           type: "validation_error",
           title: `${section.label} Missing Files`,
           errors: {
-            missingFiles: `Please upload all required files: ${missingFiles.join(
-              ", "
-            )}`,
+            missingFiles: `Please upload all required files: ${missingFiles.join(", ")}`,
           },
         },
       });
       setSubmissionStatus("error");
       setIsErrorPopupOpen(true);
       setIsSubmitting(false);
+      setUploadingSections(prev => ({
+        ...prev,
+        [sectionKey]: false
+      }));
       return;
     }
-
+  
     try {
       // Format phone number with prefix
       const prependPrefix = (phone) => {
@@ -515,7 +516,7 @@ function Form() {
           ? phone
           : `+62${phone.replace(/^0+/, "")}`;
       };
-
+  
       // Get province and kabupaten codes
       const provinceObj = provinces.find((p) => p.LG === selectedProvince);
       if (!provinceObj) {
@@ -523,9 +524,13 @@ function Form() {
         setPopupMessages(["Please select a valid province"]);
         setIsErrorPopupOpen(true);
         setIsSubmitting(false);
+        setUploadingSections(prev => ({
+          ...prev,
+          [sectionKey]: false
+        }));
         return;
       }
-
+  
       // Prepare form data with province code
       const currentFormData = FormData[status];
       const preparedFormData = {
@@ -535,7 +540,7 @@ function Form() {
         email: currentFormData.email,
         phone: prependPrefix(currentFormData.phone),
       };
-
+  
       // Handle kabupaten case
       if (status === "kabupaten") {
         const kabupatenObj = kabupatenList.find(
@@ -546,28 +551,40 @@ function Form() {
           setPopupMessages(["Please select a valid kabupaten"]);
           setIsErrorPopupOpen(true);
           setIsSubmitting(false);
+          setUploadingSections(prev => ({
+            ...prev,
+            [sectionKey]: false
+          }));
           return;
         }
         preparedFormData.admin_code =
           provinceObj.adm_prov + kabupatenObj.adm_kab; // Combine province and kabupaten codes
       }
-
+  
       // Prepare data for this section
       const sectionData = {
         FormData: [preparedFormData],
       };
-
-      // Add all files from this section (both required and optional)
-      const allSectionFiles = section.files.map((file) =>
+  
+      // Add all files from this section (both required and optional)  
+      let allSectionFiles = section.files.map((file) =>
         typeof file === "string" ? file : file.name
       );
-
+  
+      if (sectionKey === "survey") {
+        allSectionFiles = [
+          ...allSectionFiles,
+          ...structureFiles,
+          ...trafficFiles,
+        ];
+      }
+  
       // Check if this is a Link upload or DRP/Alignment upload
       const isLinkUpload =
         sectionKey === "map" && files["Link"] && !uploadedSections["map"];
       const isDRPOrAlignmentUpload =
-        (files["DRP"] || files["Alignment"]) && uploadedSections["map"];
-
+        sectionKey === "map" && (files["DRP"] || files["Alignment"]) && uploadedSections["map"];
+  
       if (isLinkUpload) {
         // For Link upload, only send the Link file
         if (excelJson["Link"]) {
@@ -589,9 +606,9 @@ function Form() {
           }
         });
       }
-
+  
       console.log("Sending data to backend:", sectionData);
-
+  
       // Make API request
       const response = await fetch("http://127.0.0.1:8000/api/upload-data/", {
         method: "POST",
@@ -601,10 +618,10 @@ function Form() {
         },
         body: JSON.stringify(sectionData),
       });
-
+  
       const responseData = await response.json();
       console.log("Backend response:", responseData);
-
+  
       if (!response.ok) {
         // Handle validation errors
         if (
@@ -612,7 +629,7 @@ function Form() {
           responseData.status === "error"
         ) {
           let formattedErrors = {};
-
+  
           // Handle FormData validation errors
           if (responseData.errors?.FormData_record_2?.errors) {
             formattedErrors.FormData = {
@@ -639,7 +656,7 @@ function Form() {
               formattedErrors.FormData.errors[field] = errorMessage;
             });
           }
-
+  
           // Handle file-specific errors
           if (responseData.errors) {
             Object.entries(responseData.errors).forEach(
@@ -648,33 +665,32 @@ function Form() {
                   const [fileName, recordNumber] = key.includes("_")
                     ? key.split("_")
                     : [key, "N/A"];
-
+  
                   // Convert file names to user-friendly names
                   const friendlyFileName = fileName
                     .replace("CODE_AN_", "")
                     .replace(/([A-Z])/g, " $1")
                     .trim();
-
+  
                   if (errorDetails.errors) {
                     formattedErrors[friendlyFileName] = {
                       type: "validation_error",
                       title: `${friendlyFileName} Errors`,
                       errors: {},
                     };
-
+  
                     const errorText = Array.isArray(errorDetails.errors)
                       ? errorDetails.errors.join(", ")
                       : Object.entries(errorDetails.errors)
-                          .map(([field, errors]) => {
-                            const friendlyField = field
-                              .replace(/_/g, " ")
-                              .replace(/\b\w/g, (l) => l.toUpperCase());
-                            return `${friendlyField}: ${
-                              Array.isArray(errors) ? errors.join(", ") : errors
+                        .map(([field, errors]) => {
+                          const friendlyField = field
+                            .replace(/_/g, " ")
+                            .replace(/\b\w/g, (l) => l.toUpperCase());
+                          return `${friendlyField}: ${Array.isArray(errors) ? errors.join(", ") : errors
                             }`;
-                          })
-                          .join("; ");
-
+                        })
+                        .join("; ");
+  
                     formattedErrors[friendlyFileName].errors[
                       `Record ${recordNumber}`
                     ] = errorText;
@@ -702,24 +718,34 @@ function Form() {
               }
             );
           }
-
+  
           setErrors(formattedErrors);
           setSubmissionStatus("error");
           setIsErrorPopupOpen(true);
-          // Remove the tick indicator for this section since there were errors
-          setUploadedSections((prev) => ({
-            ...prev,
-            [sectionKey]: false,
-          }));
+          
+          // THIS IS THE KEY CHANGE - Only remove the tick indicator for this section 
+          // if it's a Link upload or a regular section, but not for DRP/Alignment uploads
+          if (!isDRPOrAlignmentUpload) {
+            setUploadedSections((prev) => ({
+              ...prev,
+              [sectionKey]: false,
+            }));
+          } 
+          // For DRP/Alignment uploads with errors, we keep the "map" section marked as uploaded
+          
           setIsSubmitting(false);
+          setUploadingSections(prev => ({
+            ...prev,
+            [sectionKey]: false
+          }));
           return;
         }
-
+  
         throw new Error(
           responseData.message || `HTTP error! status: ${response.status}`
         );
       }
-
+  
       // Handle success response
       if (responseData.status === "success") {
         setSubmissionStatus("success");
@@ -733,14 +759,18 @@ function Form() {
           },
         });
         setIsErrorPopupOpen(true);
+        
         // Set the tick indicator for this section
-        setUploadedSections((prev) => ({
-          ...prev,
-          [sectionKey]: true,
-        }));
-
+        // For DRP/Alignment uploads, we don't modify the "map" section's uploaded status
+        if (!isDRPOrAlignmentUpload) {
+          setUploadedSections((prev) => ({
+            ...prev,
+            [sectionKey]: true,
+          }));
+        }
+  
         // Enable dependent sections only if Link section was successfully uploaded
-        if (sectionKey === "map") {
+        if (sectionKey === "map" && !isDRPOrAlignmentUpload) {
           const linkUploaded = files["Link"];
           setSections((prev) => ({
             ...prev,
@@ -765,7 +795,7 @@ function Form() {
       } else if (responseData.status === "partial_success") {
         setSubmissionStatus("partial_success");
         const formattedErrors = {};
-
+  
         // Format successful models
         if (
           responseData.successful_models &&
@@ -781,7 +811,7 @@ function Form() {
               "Successfully processed";
           });
         }
-
+  
         // Format error details
         if (responseData.errors) {
           Object.entries(responseData.errors).forEach(([model, records]) => {
@@ -790,55 +820,60 @@ function Form() {
               title: `${model} Errors`,
               errors: {},
             };
-
+  
             Object.entries(records).forEach(([recordKey, errorData]) => {
               const recordNumber = recordKey.split("_").pop();
               const errorMessage = Array.isArray(errorData.errors)
-                ? errorData.errors.join(", ")
-                : Object.entries(errorData.errors)
-                    .map(
-                      ([field, errors]) =>
-                        `${field}: ${
-                          Array.isArray(errors) ? errors.join(", ") : errors
-                        }`
-                    )
-                    .join("; ");
-
+              ? errorData.errors.join(", ")
+              : Object.entries(errorData.errors)
+                  .map(([field, errors]) => {
+                    if (field === "__all__") {
+                      return Array.isArray(errors) ? errors.join(", ") : errors;
+                    }
+                    return `${field}: ${Array.isArray(errors) ? errors.join(", ") : errors}`;
+                  })
+                  .join("; ");
+            
+                         
+  
               formattedErrors[model].errors[`Record ${recordNumber}`] =
                 errorMessage;
             });
           });
         }
-
+  
         setErrors(formattedErrors);
         setIsErrorPopupOpen(true);
-        // Remove the tick indicator for this section since there were errors
-        setUploadedSections((prev) => ({
-          ...prev,
-          [sectionKey]: false,
-        }));
-
-        // Disable dependent sections if Link section upload failed
-        if (sectionKey === "map") {
-          setSections((prev) => ({
+        
+        // Same logic for partial success - don't remove map section status for DRP/Alignment uploads
+        if (!isDRPOrAlignmentUpload) {
+          setUploadedSections((prev) => ({
             ...prev,
-            map: {
-              ...prev.map,
-              files: prev.map.files.map((file) => {
-                if (
-                  typeof file === "object" &&
-                  (file.name === "Alignment" || file.name === "DRP")
-                ) {
-                  return { ...file, enabled: false };
-                }
-                return file;
-              }),
-            },
-            survey: {
-              ...prev.survey,
-              enabled: false,
-            },
+            [sectionKey]: false,
           }));
+  
+          // Disable dependent sections if Link section upload failed
+          if (sectionKey === "map") {
+            setSections((prev) => ({
+              ...prev,
+              map: {
+                ...prev.map,
+                files: prev.map.files.map((file) => {
+                  if (
+                    typeof file === "object" &&
+                    (file.name === "Alignment" || file.name === "DRP")
+                  ) {
+                    return { ...file, enabled: false };
+                  }
+                  return file;
+                }),
+              },
+              survey: {
+                ...prev.survey,
+                enabled: false,
+              },
+            }));
+          }
         }
       }
     } catch (error) {
@@ -852,11 +887,14 @@ function Form() {
       });
       setSubmissionStatus("error");
       setIsErrorPopupOpen(true);
-      // Remove the tick indicator for this section since there was an error
-      setUploadedSections((prev) => ({
-        ...prev,
-        [sectionKey]: false,
-      }));
+      
+      // Same logic for exception handling - don't remove map section status for DRP/Alignment uploads
+      if (!(sectionKey === "map" && (files["DRP"] || files["Alignment"]) && uploadedSections["map"])) {
+        setUploadedSections((prev) => ({
+          ...prev,
+          [sectionKey]: false,
+        }));
+      }
     } finally {
       setIsSubmitting(false);
       setUploadingSections(prev => ({
@@ -975,16 +1013,14 @@ function Form() {
           return (
             <div
               key={key}
-              className={`file-upload-card ${
-                !isEnabled || shouldDisable ? "disabled" : ""
-              }`}
+              className={`file-upload-card ${!isEnabled || shouldDisable ? "disabled" : ""
+                }`}
             >
               <div className="file-content">
                 {!files[key] ? (
                   <label
-                    className={`file-label ${
-                      !isEnabled || shouldDisable ? "disabled" : ""
-                    }`}
+                    className={`file-label ${!isEnabled || shouldDisable ? "disabled" : ""
+                      }`}
                   >
                     <div className="upload-content">
                       <span className="upload-icon">+</span>
@@ -998,8 +1034,8 @@ function Form() {
                         {shouldDisable
                           ? "Upload Link section first"
                           : !isEnabled
-                          ? "Upload prerequisite files first"
-                          : "Click to upload"}
+                            ? "Upload prerequisite files first"
+                            : "Click to upload"}
                       </p>
                     </div>
                     <input
@@ -1038,15 +1074,28 @@ function Form() {
    */
   const renderActiveSection = () => {
     if (!activeSection) return null;
-
+  
     const section = sections[activeSection];
     const isUploaded = uploadedSections[activeSection];
-    const hasRequiredFiles = section.files.some((file) => {
-      const fileKey = typeof file === "string" ? file : file.name;
-      const isRequired = typeof file === "string" ? true : file.required;
-      return isRequired && files[fileKey];
-    });
-
+    
+    // Determine if there are any files uploaded for this section
+    let hasRequiredFiles = false;
+    
+    if (activeSection === "survey") {
+      const allSurveyFiles = [
+        ...section.files.map((file) => (typeof file === "string" ? file : file.name)),
+        ...structureFiles,
+        ...trafficFiles,
+      ];
+      hasRequiredFiles = allSurveyFiles.some((fileKey) => files[fileKey]);
+    } else if (activeSection === "map" || activeSection === "unitCosts" || activeSection === "parameters") {
+      // For other sections, check if any required files exist
+      hasRequiredFiles = section.files.some((file) => {
+        const fileKey = typeof file === "string" ? file : file.name;
+        return files[fileKey];
+      });
+    }
+  
     return (
       <motion.div
         className="active-section-container"
@@ -1061,14 +1110,28 @@ function Form() {
             ×
           </button>
         </div>
-
+  
         {/* Render main section file upload cards */}
         {renderFileUploadCards(
           section.files,
           activeSection === "map" || activeSection === "survey"
         )}
-
-        {/* Upload button for the section */}
+  
+        {/* Survey-specific subsections */}
+        {activeSection === "survey" && (
+          <>
+            <div className="subsection-container">
+              <h4 className="subsection-title">Structure</h4>
+              {renderFileUploadCards(structureFiles)}
+            </div>
+            <div className="subsection-container">
+              <h4 className="subsection-title">Traffic</h4>
+              {renderFileUploadCards(trafficFiles)}
+            </div>
+          </>
+        )}
+        
+        {/* Upload button for ALL sections */}
         <div className="section-upload-container">
           <button
             className={`section-upload-button ${isUploaded ? 'uploaded' : ''} ${uploadingSections[activeSection] ? 'uploading' : ''}`}
@@ -1077,29 +1140,7 @@ function Form() {
           >
             {uploadingSections[activeSection] ? 'Uploading...' : (isUploaded ? '✓ Re-upload Section' : 'Upload Section')}
           </button>
-          {errors.validation && (
-            <div className="error-message">
-              {errors.validation.errors.map((error, index) => (
-                <div key={index}>{error}</div>
-              ))}
-            </div>
-          )}
         </div>
-
-        {/* For Survey section, render additional Structure and Traffic sections directly */}
-        {activeSection === "survey" && (
-          <>
-            <div className="subsection-container">
-              <h4 className="subsection-title">Structure</h4>
-              {renderFileUploadCards(structureFiles)}
-            </div>
-
-            <div className="subsection-container">
-              <h4 className="subsection-title">Traffic</h4>
-              {renderFileUploadCards(trafficFiles)}
-            </div>
-          </>
-        )}
       </motion.div>
     );
   };
@@ -1172,11 +1213,13 @@ function Form() {
       uploadedFiles = section.files.filter((key) => files[key]).length;
     }
 
-    // Add structure and traffic files to the count for survey section
+    // Add structure files to the count for survey section
     if (sectionKey === "survey") {
-      totalFiles += structureFiles.length + trafficFiles.length;
+      totalFiles += structureFiles.length;
       uploadedFiles += structureFiles.filter((key) => files[key]).length;
+      totalFiles += trafficFiles.length;
       uploadedFiles += trafficFiles.filter((key) => files[key]).length;
+
     }
 
     return totalFiles > 0 ? Math.round((uploadedFiles / totalFiles) * 100) : 0;
@@ -1205,11 +1248,9 @@ function Form() {
       uploaded = section.files.filter((key) => files[key]).length;
     }
 
-    // Add structure and traffic counts for survey section
+    // Add structure counts for survey section
     if (sectionKey === "survey") {
-      const structureUploaded = structureFiles.filter(
-        (key) => files[key]
-      ).length;
+      const structureUploaded = structureFiles.filter((key) => files[key]).length;
       const trafficUploaded = trafficFiles.filter((key) => files[key]).length;
 
       return {
@@ -1220,6 +1261,7 @@ function Form() {
         trafficUploaded,
         trafficTotal: trafficFiles.length,
       };
+
     }
 
     return { uploaded, total };
@@ -1378,9 +1420,8 @@ function Form() {
               setSelectedKabupaten("");
               setKabupatenList([]);
             }}
-            className={`select-status small-select ${
-              errors?.formValidation?.errors?.status ? "input-error" : ""
-            }`}
+            className={`select-status small-select ${errors?.formValidation?.errors?.status ? "input-error" : ""
+              }`}
           >
             <option value="">-- Select --</option>
             <option value="provincial">Provincial</option>
@@ -1392,9 +1433,8 @@ function Form() {
             <select
               value={selectedProvince}
               onChange={handleProvinceChange}
-              className={`select-status small-select ${
-                errors?.formValidation?.errors?.province ? "input-error" : ""
-              }`}
+              className={`select-status small-select ${errors?.formValidation?.errors?.province ? "input-error" : ""
+                }`}
             >
               <option value="">-- Select Province --</option>
               {provinces.map((prov) => (
@@ -1410,9 +1450,8 @@ function Form() {
             <select
               value={selectedKabupaten}
               onChange={(e) => setSelectedKabupaten(e.target.value)}
-              className={`select-status small-select ${
-                errors?.formValidation?.errors?.kabupaten ? "input-error" : ""
-              }`}
+              className={`select-status small-select ${errors?.formValidation?.errors?.kabupaten ? "input-error" : ""
+                }`}
               disabled={!kabupatenList.length}
             >
               <option value="">-- Select Kabupaten --</option>
@@ -1439,9 +1478,8 @@ function Form() {
             return (
               <motion.button
                 key={sectionKey}
-                className={`section-button ${
-                  !section.enabled ? "disabled" : ""
-                } ${activeSection === sectionKey ? "active" : ""}`}
+                className={`section-button ${!section.enabled ? "disabled" : ""
+                  } ${activeSection === sectionKey ? "active" : ""}`}
                 onClick={() => handleSectionClick(sectionKey)}
                 disabled={!section.enabled}
                 whileHover={section.enabled ? { scale: 1.03 } : {}}
@@ -1463,7 +1501,9 @@ function Form() {
                   <span className="progress-text">
                     {fileCounts.uploaded}/{fileCounts.total} files
                     {sectionKey === "survey" &&
-                      ` + ${fileCounts.structureUploaded}/${fileCounts.structureTotal} structure + ${fileCounts.trafficUploaded}/${fileCounts.trafficTotal} traffic`}
+                      ` + ${fileCounts.structureUploaded}/${fileCounts.structureTotal} structure` +
+                      ` + ${fileCounts.trafficUploaded}/${fileCounts.trafficTotal} traffic`}
+
                   </span>
                   {isUploaded && (
                     <div className="uploaded-badge">

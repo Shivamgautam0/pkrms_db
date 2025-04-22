@@ -61,7 +61,7 @@ class BridgeInventory(models.Model):
     def clean(self):
         errors = {}
         if not self.admin_code:
-            errors['admin_code'] = 'Province Code and Kabupaten Code is required.'    
+            errors['admin_code'] = 'This field is required.'  # More specific message needed
         if not self.year:
             errors['year'] = 'This field is required.'
         if not self.link_no:

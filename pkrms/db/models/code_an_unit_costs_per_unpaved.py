@@ -8,10 +8,10 @@ class CODE_AN_UnitCostsPERUnpaved(models.Model):
     res_unitcost = models.CharField(max_length=255, null=True, blank=True, db_column='resUnitcost')
 
     def clean(self):
-        # Validate required fields
         errors = {}
         if not self.admin_code:
             errors['admin_code'] = 'This field is required.'
+        if errors:
             raise ValidationError(errors)
     def save(self, *args, **kwargs):
         self.full_clean()

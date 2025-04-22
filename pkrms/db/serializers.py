@@ -1,5 +1,6 @@
 from django.forms import ValidationError
 from rest_framework import serializers
+from django.db import models
 from .models import (
     BridgeInventory,
     CODE_AN_Parameters,
@@ -114,6 +115,17 @@ class RetainingWallInventorySerializer(serializers.ModelSerializer):
 
 class RoadConditionSerializer(serializers.ModelSerializer):
     def validate(self, data):
+        # Convert all non-string values to strings for CharField fields
+        char_fields = [f.name for f in RoadCondition._meta.get_fields() if isinstance(f, models.CharField)]
+        for key in char_fields:
+            if key in data:
+                # Handle None values by converting to empty string
+                if data[key] is None:
+                    data[key] = ""
+                # Handle non-string values
+                elif not isinstance(data[key], str):
+                    data[key] = str(data[key])
+
         try:
             instance = RoadCondition(**data)
             instance.clean()
@@ -165,7 +177,10 @@ class TrafficWeightingFactorsSerializer(serializers.ModelSerializer):
 class DRPSerializer(serializers.ModelSerializer):
     def validate(self, data):
         try:
+            is_last_in_link = data.pop('is_last_in_link', False)
             instance = DRP(**data)
+            setattr(instance, 'is_last_in_link', is_last_in_link)
+
             instance.clean()
         except ValidationError as e:
             error_message = str(e)
@@ -173,7 +188,6 @@ class DRPSerializer(serializers.ModelSerializer):
                 error_message = e.messages[0]
             raise serializers.ValidationError({'error': error_message})
         return data
-
     class Meta:
         model = DRP
         fields = '__all__'
@@ -181,7 +195,10 @@ class DRPSerializer(serializers.ModelSerializer):
 class AlignmentSerializer(serializers.ModelSerializer):
     def validate(self, data):
         try:
+            is_last_in_link = data.pop('is_last_in_link', False)
             instance = Alignment(**data)
+            setattr(instance, 'is_last_in_link', is_last_in_link)
+
             instance.clean()
         except ValidationError as e:
             error_message = str(e)
@@ -192,7 +209,7 @@ class AlignmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Alignment
-        fields = '__all__'
+        fields = '__all__'  
 
 class RoadHazardSerializer(serializers.ModelSerializer):
     def validate(self, data):
@@ -208,4 +225,4 @@ class RoadHazardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RoadHazard
-        fields = '__all__'  
+        fields = '__all__'

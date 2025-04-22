@@ -9,8 +9,8 @@ class CODE_AN_Parameters(models.Model):
     irif = models.CharField(max_length=255, null=True, blank=True, db_column='irif')
     iri_wf = models.CharField(max_length=255, null=True, blank=True, db_column='iri_wf')
     surfaceloss_wf = models.CharField(max_length=255, null=True, blank=True, db_column='surfaceloss_wf')
-    bleeding_wf = models.FloatField(max_length=255, null=True, blank=True, db_column='bleeding_wf')
-    ravelling_wf = models.FloatField(max_length=255, null=True, blank=True, db_column='ravelling_wf')
+    bleeding_wf = models.FloatField(max_length=255, null=True, blank=True, db_column='bleeding_wf')  # FloatField shouldn't have max_length
+    ravelling_wf = models.FloatField(max_length=255, null=True, blank=True, db_column='ravelling_wf')  # FloatField shouldn't have max_length
     desintegration_wf = models.CharField(max_length=255, null=True, blank=True, db_column='desintegration_wf')
     crackdep_wf = models.CharField(max_length=255, null=True, blank=True, db_column='crackdep_wf')
     patching_wf = models.CharField(max_length=255, null=True, blank=True, db_column='patching_wf')

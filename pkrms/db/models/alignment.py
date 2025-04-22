@@ -1,10 +1,12 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.db.models import Max
 from .link import Link
+
 class Alignment(models.Model):
     # id = models.AutoField(primary_key=True,db_column='id')
-    admin_code = models.CharField(max_length=255,null=False, blank=False, db_column='adminCode')
-    link_no = models.ForeignKey(Link, on_delete=models.CASCADE,null=True, blank=True, db_column='linkNo',to_field='link_no')
+    admin_code = models.CharField(max_length=255, null=False, blank=False, db_column='adminCode')
+    link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo', to_field='link_no')
     chainage = models.CharField(max_length=255, null=False, blank=False, db_column='chainage')
     chainage_rb = models.CharField(max_length=255, null=True, blank=True, db_column='chainageRb')
     gps_point_north_deg = models.CharField(max_length=255, null=True, blank=True, db_column='gpsPointNorthDeg')
@@ -18,8 +20,8 @@ class Alignment(models.Model):
     north = models.CharField(max_length=255, null=True, blank=True, db_column='north')
     hemis_ns = models.CharField(max_length=255, null=True, blank=True, db_column='hemisNS')
 
+
     def clean(self):
-        # Validate required fields
         errors = {}
         if not self.admin_code:
             errors['admin_code'] = 'This field is required.'
@@ -29,25 +31,32 @@ class Alignment(models.Model):
             errors['chainage'] = 'This field is required.'
         if errors:
             raise ValidationError(errors)
-
-        # Validate chainage if provided
-        if self.chainage:
+    
+        try:
+            chainage_value = float(self.chainage)
+        except (ValueError, TypeError):
+            raise ValidationError("Invalid chainage value: Must be a number.")
+    
+        is_last = getattr(self, 'is_last_in_link', False)
+    
+        if is_last:
             try:
-                chainage_value = float(self.chainage)
-                # Get link length in meters (assuming it's stored in kilometers)
-                link_length_km = float(self.link_no.link_length_actual)
-                link_length_m = link_length_km * 1000  # Convert km to meters
-                
-                # Check if the chainage is within 50 meters of the link length
+                link_length_m = float(self.link_no.link_length_actual) * 1000
                 if abs(chainage_value - link_length_m) > 50:
-                    error_msg = (
-                        f"⚠️ Chainage Length Mismatch: Your chainage ({chainage_value:.1f}m) "
-                        f"exceeds the actual road length ({link_length_m:.1f}m) by more than 50m. "
-                        f"Please ensure the chainage is within 50m of the actual road length."
+                    raise ValidationError(
+                        f"⚠️ Chainage Length Mismatch: The Difference Between final chainage : ({chainage_value:.1f}m) and the actual road length : ({link_length_m:.1f}m) "
+                        f" exceeds by more than 50m."
                     )
-                    raise ValidationError(error_msg)
             except (ValueError, TypeError, AttributeError) as e:
-                raise ValidationError(f"Invalid chainage value: {str(e)}")
+                raise ValidationError(f"Invalid or missing link length data for validation: {str(e)}")
+
+    @staticmethod
+    def _is_float(value):
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -60,5 +69,3 @@ class Alignment(models.Model):
         db_table = 'Alignment'
         verbose_name = 'Alignment'
         verbose_name_plural = 'Alignments'
-
-

@@ -6,6 +6,7 @@ from django.apps import apps
 from django.core.exceptions import ValidationError
 from .parsers import CustomJSONParser
 from .models.form_data import FormData
+from .models.link import Link  # Add this import
 import math
 import numpy as np
 from .utils.helpers import generate_admin_code
@@ -170,12 +171,153 @@ class UploadDataView(APIView):
                             'message': f'No serializer found for model {model_name}'
                         }
                         continue
-
+                    
                     processed_records = []
-                    for record in records:
-                        record = standardize_field_names(record)
-                        record = process_admin_code(record)
-                        processed_records.append(record)
+                    if model_name == 'Alignment':
+                        try:
+                            def safe_float(val, default=0.0):
+                                try:
+                                    return float(val)
+                                except (ValueError, TypeError):
+                                    return default
+
+                            # Group records by link_no
+                            link_groups = {}
+                            for record in records:
+                                std_record = standardize_field_names(record)
+                                link_no = std_record.get('link_no') or std_record.get('link_no')
+                                if link_no not in link_groups:
+                                    link_groups[link_no] = []
+                                link_groups[link_no].append(std_record)
+                            
+                            processed_records = []
+                            # Process each link group separately
+                            for link_no, group in link_groups.items():
+                                # Sort by chainage within the group
+                                sorted_group = sorted(group, key=lambda r: safe_float(r.get('chainage')))
+                                
+                                # Try to get the link object to check its length
+                                try:
+                                    link_obj = Link.objects.get(link_no=link_no)
+                                    link_length_m = float(link_obj.link_length_actual) * 1000  # Convert km to m
+                                    
+                                    # Process each record in the group
+                                    for i, record in enumerate(sorted_group):
+                                        record = process_admin_code(record)
+                                        
+                                        # Mark the last record in each link group
+                                        is_last = (i == len(sorted_group) - 1)
+                                        record['is_last_in_link'] = is_last
+                                        
+                                        # For the last record, check if chainage is close to link length
+                                        if is_last:
+                                            try:
+                                                chainage = safe_float(record.get('chainage'))
+                                                if abs(chainage - link_length_m) > 50:
+                                                    # Add warning but still process the record
+                                                    record['warning'] = f"Last chainage ({chainage:.1f}m) differs from link length ({link_length_m:.1f}m) by more than 50m"
+                                            except (ValueError, TypeError):
+                                                pass
+                                        
+                                        processed_records.append(record)
+                                except Link.DoesNotExist:
+                                    # If link doesn't exist, still process but add warning
+                                    for i, record in enumerate(sorted_group):
+                                        record = process_admin_code(record)
+                                        record['is_last_in_link'] = (i == len(sorted_group) - 1)
+                                        record['warning'] = f"Link with link_no={link_no} does not exist"
+                                        processed_records.append(record)
+                        except Exception as e:
+                            results[model_name] = {
+                                'status': 'error',
+                                'message': f'Error processing data: {str(e)}'
+                            }
+                            continue
+                    def preprocess_road_condition_data(records):
+                         processed = []
+                         for record in records:
+                             record = standardize_field_names(record)
+                             record = process_admin_code(record)
+
+                             # Force convert all fields to strings
+                             for key, value in list(record.items()):
+                                 if value is not None and not isinstance(value, str):
+                                     record[key] = str(value)
+                                 elif value is None:
+                                     # Either set to empty string or leave as None depending on your DB config
+                                     # record[key] = ""  # Uncomment if you want to convert None to empty string
+                                     pass
+
+                             processed.append(record)
+                         return processed
+                    if model_name == 'RoadCondition':
+                        processed_records = preprocess_road_condition_data(records)
+                    if model_name == 'DRP':
+                        try:
+                            def safe_float(val, default=0.0):
+                                try:
+                                    return float(val)
+                                except (ValueError, TypeError):
+                                    return default
+
+                            # Group records by link_no
+                            link_groups = {}
+                            for record in records:
+                                std_record = standardize_field_names(record)
+                                link_no = std_record.get('link_no') or std_record.get('link_no')
+                                if link_no not in link_groups:
+                                    link_groups[link_no] = []
+                                link_groups[link_no].append(std_record)
+                            
+                            processed_records = []
+                            # Process each link group separately
+                            for link_no, group in link_groups.items():
+                                # Sort by chainage within the group
+                                sorted_group = sorted(group, key=lambda r: safe_float(r.get('chainage')))
+                                
+                                # Try to get the link object to check its length
+                                try:
+                                    link_obj = Link.objects.get(link_no=link_no)
+                                    link_length_m = float(link_obj.link_length_actual) * 1000  # Convert km to m
+                                    
+                                    # Process each record in the group
+                                    for i, record in enumerate(sorted_group):
+                                        record = process_admin_code(record)
+                                        
+                                        # Mark the last record in each link group
+                                        is_last = (i == len(sorted_group) - 1)
+                                        record['is_last_in_link'] = is_last
+                                        
+                                        # For the last record, check if chainage is close to link length
+                                        if is_last:
+                                            try:
+                                                chainage = safe_float(record.get('chainage'))
+                                                if abs(chainage - link_length_m) > 50:
+                                                    # Add warning but still process the record
+                                                    record['warning'] = f"Last chainage ({chainage:.1f}m) differs from link length ({link_length_m:.1f}m) by more than 50m"
+                                            except (ValueError, TypeError):
+                                                pass
+                                        
+                                        processed_records.append(record)
+                                except Link.DoesNotExist:
+                                    # If link doesn't exist, still process but add warning
+                                    for i, record in enumerate(sorted_group):
+                                        record = process_admin_code(record)
+                                        record['is_last_in_link'] = (i == len(sorted_group) - 1)
+                                        record['warning'] = f"Link with link_no={link_no} does not exist"
+                                        processed_records.append(record)
+                        except Exception as e:
+                            results[model_name] = {
+                                'status': 'error',
+                                'message': f'Error processing data: {str(e)}'
+                            }
+                            continue
+
+                    if model_name != 'DRP' and model_name != 'Alignment' :
+                        for record in records:
+                            record = standardize_field_names(record)
+                            record = process_admin_code(record)
+                            processed_records.append(record)
 
                     # First validate all records
                     model_validation_errors = {}
@@ -200,6 +342,11 @@ class UploadDataView(APIView):
                             model_validation_errors[f"{model_name}_record_{i+2}"] = {
                                 'record': record,
                                 'errors': str(e)
+                            }
+                        except Exception as e:
+                            model_validation_errors[f"{model_name}_record_{i+2}"] = {
+                                'record': record,
+                                'errors': f'Unexpected error: {str(e)}'
                             }
 
                     # If any validation errors, reject all records for this model
@@ -237,6 +384,12 @@ class UploadDataView(APIView):
                                 'errors': str(e)
                             }
                             break  # Stop processing if any record fails
+                        except Exception as e:
+                            model_validation_errors[f"{model_name}_record_{processed_records.index(record)+2}"] = {
+                                'record': record,
+                                'errors': f'Unexpected error during save: {str(e)}'
+                            }
+                            break
 
                     if model_validation_errors:
                         results[model_name] = {
@@ -256,7 +409,7 @@ class UploadDataView(APIView):
                 except Exception as e:
                     results[model_name] = {
                         'status': 'error',
-                        'message': str(e)
+                        'message': f'Error processing {model_name}: {str(e)}'
                     }
 
             # Check if any model had validation errors
@@ -289,5 +442,5 @@ class UploadDataView(APIView):
         except Exception as e:
             return Response({
                 'status': 'error',
-                'message': str(e)
+                'message': f'Unexpected error: {str(e)}'
             }, status=status.HTTP_400_BAD_REQUEST)

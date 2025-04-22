@@ -9,9 +9,9 @@ class RoadInventory(models.Model):
     link_no = models.ForeignKey(Link, on_delete=models.CASCADE, null=True, blank=True, db_column='linkNo',to_field='link_no')
     chainagefrom = models.CharField(max_length=255, db_column='chainageFrom')
     chainageto = models.CharField(max_length=255, db_column='chainageTo')
-    row = models.CharField(max_length=255, db_column='row')
-    pave_width = models.CharField(max_length=255, db_column='paveWidth')
-    pave_type = models.CharField(max_length=255, db_column='paveType')
+    row = models.CharField(max_length=255,null=True, blank=True, db_column='row')
+    pave_width = models.CharField(max_length=255,null=True, blank=True, db_column='paveWidth')
+    pave_type = models.CharField(max_length=255,null=True, blank=True, db_column='paveType')
     
     drp_from = models.CharField(max_length=255, null=True, blank=True, db_column='drpFrom')
     offset_from = models.CharField(max_length=255, null=True, blank=True, db_column='offsetFrom')
@@ -79,29 +79,7 @@ class RoadInventory(models.Model):
                 )
                 raise ValidationError(error_msg)
 
-        # Get the maximum chainage value from all records (including this one)
-        all_chainage_values = [float(r.chainageto) for r in existing_records] + [current_to]
-        max_chainage = max(all_chainage_values)
-        
-        # Only check link length if this is the last record for this link_no
-        # or if this record's chainageto is the highest among all records
-        if current_to == max_chainage:
-            try:
-                # Get link length in meters (assuming it's stored in kilometers)
-                link_length_km = float(self.link_no.link_length_actual)
-                link_length_m = link_length_km * 1000  # Convert km to meters
-                
-                # Check if the difference is more than 50 meters
-                difference = abs(max_chainage - link_length_m)
-                if difference > 50:
-                    error_msg = (
-                        f"⚠️ Chainage Length Mismatch: Your total chainage ({max_chainage:.1f}m) "
-                        f"differs from the actual road length ({link_length_m:.1f}m) by {difference:.1f}m. "
-                        f"Please ensure all segments are properly connected and the total length is within 50m of the actual road length."
-                    )
-                    raise ValidationError(error_msg)
-            except (ValueError, TypeError, AttributeError) as e:
-                raise ValidationError(f"Invalid link length value: {str(e)}")
+
         else:
             # This is not the last record, so we don't need to check the link length
             pass

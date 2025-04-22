@@ -17,10 +17,9 @@ class RoadHazard(models.Model):
     y_end_dd = models.CharField(max_length=255, null=True, blank=True, db_column='yEndDd')
     
     def clean(self):
-        # Validate required fields
         errors = {}
         if not self.year:
-            errors['year'] = 'This field is required.'  
+            errors['year'] = 'This field is required. Please enter a valid year.'  # More descriptive message
         if not self.admin_code:
             errors['admin_code'] = 'This field is required.'
         if not self.link_no:
